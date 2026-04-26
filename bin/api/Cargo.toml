@@ -1,0 +1,34 @@
+[package]
+name = "rustic-ai-api"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "rustic-ai-api"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+futures.workspace = true
+jsonwebtoken.workspace = true
+
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_with.workspace = true
+
+tokio.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+storage-core.workspace = true
+agentic-core.workspace = true
+
+rustic-ai-domain.workspace = true
+rustic-ai-services.workspace = true
+rustic-ai-storage.workspace = true
+
+
+bin-shared = { path = "../shared" }

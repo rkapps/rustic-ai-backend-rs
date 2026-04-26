@@ -1,28 +1,43 @@
-[package]
-name = "chat-backend-rs"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+resolver = "2"
+members = ["crates/*", "bin/*"]
 
-[dependencies]
+[workspace.dependencies]
 anyhow = "1.0.100"
-tracing = {version = "0.1.40"}
-tracing-subscriber = { version= "0.3.18", features = ["env-filter"] }
-tokio = { version = "1", features = ["full"] }
-serde = { version = "1.0.228", features = ["serde_derive"] }
-serde_json = "1.0.148"
+async-trait = "0.1"
 axum = { version = "0.8.8", features = ["macros"] }
-uuid = { version = "1.0", features = ["v4"] }
-tower-http = {version = "0.6.8", features = ["cors"]}
-async-trait = "0.1.89"
-reqwest = { version = "0.12.28", features = ["json", "stream", "multipart"]}
-bytes = "1.11.0"
+bson = { version = "3.1", features = ["serde", "chrono-0_4", "serde_with-3"] }
+chrono = { version = "0.4", features = ["serde"] }
+
 futures = "0.3"
 futures-util = "0.3.31"
+google-cloud-storage = { version = "0.20", features = ["default"] }
 
-storage-core = { path = "../libs/storage-core-rs" }
-agentic-core = { path = "../libs/agentic-core-rs" }
+jsonwebtoken = "9"
+
+mongodb = { version = "3.5.1", features = ["bson-3"] }
+
+reqwest = { version = "0.12.28", features = ["json", "stream", "multipart"]}
+serde_with = { version = "3.0", features = ["macros"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0.148"
+
+tempfile = "3"
+tracing = {version = "0.1.40"}
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tokio = { version = "1", features = ["full"] }
+tower-http = {version = "0.6.8", features = ["cors"]}
+uuid = { version = "1.0", features = ["v4"] }
 
 
-[patch.crates-io]
-agentic-core = { path = "../libs/agentic-core-rs" }
+#storage-core = { path = "../libs/storage-core-rs" }
+#agentic-core = { path = "../libs/agentic-core-rs" }
+storage-core = { git = "https://github.com/rkapps/storage-core-rs" }
+agentic-core = { git = "https://github.com/rkapps/agentic-core-rs" }
 
+
+# Local app crates
+rustic-ai-chats = { path = "crates/chats" }
+rustic-ai-domain = { path = "crates/domain" }
+rustic-ai-storage = { path = "crates/storage" }
+rustic-ai-services = { path = "crates/services" }
