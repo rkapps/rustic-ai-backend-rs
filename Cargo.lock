@@ -5,7 +5,7 @@ version = 4
 [[package]]
 name = "agentic-boot"
 version = "0.1.0"
-source = "git+https://github.com/rkapps/agentic-boot#c69c053e92c599880a5f7e0d38d6187450fe57ca"
+source = "git+https://github.com/rkapps/agentic-boot#d23169c93a412748ca3346dc764da619c0676b04"
 dependencies = [
  "agentic-core",
  "anyhow",
@@ -716,6 +716,7 @@ checksum = "9f1f227452a390804cdb637b74a86990f2a7d7ba4b7d5693aac9b4dd6defd8d6"
 [[package]]
 name = "fin-analyse"
 version = "0.1.0"
+source = "git+https://github.com/rkapps/fin-tracker-backend-rs#948a311870e7876ca7d6f142e9898dbf02954dbe"
 dependencies = [
  "agentic-core",
  "anyhow",
@@ -733,6 +734,7 @@ dependencies = [
 [[package]]
 name = "fin-domain"
 version = "0.1.0"
+source = "git+https://github.com/rkapps/fin-tracker-backend-rs#948a311870e7876ca7d6f142e9898dbf02954dbe"
 dependencies = [
  "anyhow",
  "bson 3.1.0",
@@ -750,6 +752,7 @@ dependencies = [
 [[package]]
 name = "fin-providers"
 version = "0.1.0"
+source = "git+https://github.com/rkapps/fin-tracker-backend-rs#948a311870e7876ca7d6f142e9898dbf02954dbe"
 dependencies = [
  "anyhow",
  "chrono",
@@ -764,6 +767,7 @@ dependencies = [
 [[package]]
 name = "fin-storage"
 version = "0.1.0"
+source = "git+https://github.com/rkapps/fin-tracker-backend-rs#948a311870e7876ca7d6f142e9898dbf02954dbe"
 dependencies = [
  "anyhow",
  "async-trait",

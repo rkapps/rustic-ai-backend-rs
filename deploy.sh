@@ -10,8 +10,10 @@ COMPUTE_SA="$COMPUTE_SA_NUMBER-compute@developer.gserviceaccount.com"
 GCS_BUCKET="$PROJECT_ID-data"
 
 RUSTIC_AI_CONFIG_PATH="gs://$GCS_BUCKET/config"
-# FINTRACKER_DB_NAME=$FINTRACKER_DB_NAME
-# RUSTIC_AI_DB_NAME=$RUSTIC_AI_DB_NAME
+FINTRACKER_DB_NAME="finTracker"
+RUSTIC_AI_DB_NAME="rusticai"
+RUST_LOG_VALUE="rustic-ai-api=info,agentic_boot=info,agentic_core=info"
+
 
 docker build --no-cache -f Dockerfile.api \
   -t $IMAGE_REGISTRY/rustic-ai-api/rustic-ai-api . \

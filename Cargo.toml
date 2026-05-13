@@ -32,9 +32,12 @@ uuid = { version = "1.0", features = ["v4"] }
 #storage-core = { path = "../libs/storage-core-rs" }
 #agentic-core = { path = "../libs/agentic-core-rs" }
 #agentic-boot = { path = "../libs/agentic-boot" }
+#fin-analyse = { path = "../fin-tracker-backend-rs/crates/fin-analyse" }
+#fin-storage = { path = "../fin-tracker-backend-rs/crates/fin-storage" }
 
-fin-analyse = { path = "../fin-tracker-backend-rs/crates/fin-analyse" }
-fin-storage = { path = "../fin-tracker-backend-rs/crates/fin-storage" }
+fin-analyse = { git = "https://github.com/rkapps/fin-tracker-backend-rs", package = "fin-analyse"}
+fin-storage = { git = "https://github.com/rkapps/fin-tracker-backend-rs", package = "fin-storage"}
+fin-domain = { git = "https://github.com/rkapps/fin-tracker-backend-rs", package = "fin-domain"}
 
 storage-core = { git = "https://github.com/rkapps/storage-core-rs" }
 agentic-core = { git = "https://github.com/rkapps/agentic-core-rs" }
