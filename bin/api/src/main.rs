@@ -53,7 +53,7 @@ async fn main() -> Result<()> {
     let tools: Vec<Arc<dyn Tool>> = vec![
         Arc::new(TickerScreeningTool::new(
             storage_service.clone(),
-            embedding_client.clone(),
+            embedding_client,
         )),
         Arc::new(TickerTaxonomyTool::new(storage_service.clone())),
         // Arc::new(TickerSentimentTool::new(
@@ -82,6 +82,7 @@ async fn main() -> Result<()> {
         .chat_templates("chat_templates.json".to_string())
         .providers("providers.json".to_string())
         .agents_config("agents.json".to_string())
+        .mcp_config("mcp_servers_config.json".to_string())
         .mongo_database(mongo_uri, mongo_db)
         .cors_origins(origins.to_vec())
         .tools(tools)
