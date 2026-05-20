@@ -1,25 +1,32 @@
-
-// vector_search uses cosine_simularity to get the score. Returns truncated top_k.
+/// Score every candidate in `candidates` against the query vector `vec_a`
+/// using cosine similarity, then return the `top_k` highest-scoring items in
+/// descending order.
+///
+/// `K` is the identifier type (e.g. `String`, `Uuid`) stored alongside each
+/// candidate vector.  The returned pairs are `(id, score)`.
+///
+/// If `top_k` is larger than the number of candidates, all candidates are
+/// returned (no padding).
 pub fn search<K: Clone>(
     vec_a: &[f32],
     candidates: &[(K, Vec<f32>)],
     top_k: usize,
 ) -> Vec<(K, f32)> {
-    // Iterate the embeddings, perform cosine_similarity and return vector of id(String) and score
     let mut scores: Vec<(K, f32)> = candidates
         .iter()
         .map(|(id, vec)| (id.clone(), cosine_similarity(vec_a, vec)))
         .collect();
 
-    // Sort descending by score (highest first)
     scores.sort_by(|a, b: &(K, f32)| b.1.partial_cmp(&a.1).unwrap());
-
-    // truncate by top_k
     scores.truncate(top_k);
     scores
 }
 
-// cosine_similarity
+/// Cosine similarity between two vectors: `dot(a, b) / (|a| * |b|)`.
+///
+/// Returns a value in `[-1.0, 1.0]` where `1.0` means identical direction.
+/// Returns `0.0` when either vector is the zero vector to avoid division by
+/// zero.
 pub fn cosine_similarity(vec_a: &[f32], vec_b: &[f32]) -> f32 {
     let mut dot = 0.0;
     let mut norm_a = 0.0;
