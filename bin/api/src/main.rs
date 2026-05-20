@@ -1,29 +1,28 @@
 use std::{env, sync::Arc};
 
-use agentic_boot::{
-    logger::set_logger,
-    routes::{
-        agents::agent_routes, conversation::conversation_routes, providers::provider_routes,
-        templates::template_routes,
-    },
-    startup::boot,
-};
-
-use agentic_core::{client::tools::Tool, providers::openai::embeddings::OpenAIEmbeddingClient};
 use anyhow::Result;
 use fin_analyse::tools::{
     TickerIndicatorTool, TickerPeersTool, TickerPriceHistoryTool, TickerScreeningTool,
     TickerSnapshotTool, TickerTaxonomyTool,
 };
 use fin_storage::mongo::{MongoStorageManager, MongoStorageService};
+use rustic_agent::client::tools::Tool;
 use rustic_ai_api::state::AppState;
+use rustic_boot::{
+    boot,
+    routes::{
+        agents::agent_routes, conversation::conversation_routes, providers::provider_routes,
+        templates::template_routes,
+    },
+};
+use rustic_core::logger::set_logger;
 use tracing::debug;
 
 #[tokio::main]
 
 async fn main() -> Result<()> {
     let filter = std::env::var("RUST_LOG").unwrap_or_else(|_| {
-        "rustic_ai_api=debug,agentic_boot=info,agentic_core=info,fin_analyse=info".to_string()
+        "rustic_ai_api=debug,rustic_boot=info,rustic_core=info,fin_analyse=info".to_string()
     });
 
     set_logger(filter);
@@ -33,9 +32,9 @@ async fn main() -> Result<()> {
     let firebase_project_id = env::var("RUSTIC_AI_PROJECT_ID")
         .expect("RUSTIC_AI_PROJECT_ID envrionment variable not set");
 
-    let openai_api_key: String =
-        env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY environment variable not set");
-    let embedding_client = Arc::new(OpenAIEmbeddingClient::new(&openai_api_key)?);
+    // let openai_api_key: String =
+    //     env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY environment variable not set");
+    // let embedding_client = Arc::new(OpenAIEmbeddingClient::new(&openai_api_key)?);
 
     let mongo_db =
         env::var("FINTRACKER_DB_NAME").expect("FINTRACKER_DB_NAME envrionment variable not set");
@@ -51,19 +50,19 @@ async fn main() -> Result<()> {
     let mongo_uri = env::var("MONGO_URI").expect("MONGO_URI envrionment variable not set");
 
     let tools: Vec<Arc<dyn Tool>> = vec![
-        Arc::new(TickerScreeningTool::new(
-            storage_service.clone(),
-            embedding_client,
-        )),
-        Arc::new(TickerTaxonomyTool::new(storage_service.clone())),
-        // Arc::new(TickerSentimentTool::new(
-        //     query_embedding.clone(),
+        // Arc::new(TickerScreeningTool::new(
         //     storage_service.clone(),
+        //     embedding_client,
         // )),
-        Arc::new(TickerSnapshotTool::new(storage_service.clone())),
-        Arc::new(TickerPriceHistoryTool::new(storage_service.clone())),
-        Arc::new(TickerIndicatorTool::new(storage_service.clone())),
-        Arc::new(TickerPeersTool::new(storage_service.clone())),
+        // Arc::new(TickerTaxonomyTool::new(storage_service.clone())),
+        // // Arc::new(TickerSentimentTool::new(
+        // //     query_embedding.clone(),
+        // //     storage_service.clone(),
+        // // )),
+        // Arc::new(TickerSnapshotTool::new(storage_service.clone())),
+        // Arc::new(TickerPriceHistoryTool::new(storage_service.clone())),
+        // Arc::new(TickerIndicatorTool::new(storage_service.clone())),
+        // Arc::new(TickerPeersTool::new(storage_service.clone())),
     ];
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());

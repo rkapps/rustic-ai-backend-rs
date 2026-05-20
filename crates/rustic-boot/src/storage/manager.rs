@@ -1,5 +1,5 @@
 use anyhow::Result;
-use rustic_storage::{core::{repository::Repository, search::{SearchCriteria, SearchOp, SearchValue}}, mongo::{database::MongoDatabase, repository::MongoRepository}};
+use rustic_storage::{SearchCriteria, core::repository::Repository, mongo::{database::MongoDatabase, repository::MongoRepository}};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -67,17 +67,9 @@ impl BootStorageManager {
         };
 
         let mut repo = repo.lock().await;
-        let mut criteria = SearchCriteria::new();
-        criteria.add_condition(
-            FIELD_UID,
-            SearchOp::Eq,
-            SearchValue::String(uid.to_string()),
-        );
-        criteria.add_condition(
-            FIELD_CONVERSATION_ID,
-            SearchOp::Eq,
-            SearchValue::String(conversation_id.to_string()),
-        );
+        let criteria = SearchCriteria::new()
+            .eq(FIELD_UID, uid)
+            .eq(FIELD_CONVERSATION_ID, conversation_id);
 
         repo.delete_many(Some(criteria)).await?;
         Ok(())
@@ -92,35 +84,19 @@ impl BootStorageManager {
             return Err(anyhow::anyhow!("Error getting Conversation Repository",));
         };
         let mut repo = repo.lock().await;
-        let mut criteria = SearchCriteria::new();
-        criteria.add_condition(
-            FIELD_UID,
-            SearchOp::Eq,
-            SearchValue::String(uid.to_string()),
-        );
+        let mut criteria = SearchCriteria::new().eq(FIELD_UID, uid);
+
         if let Some(conversation_type) = query.conversation_type {
-            criteria.add_condition(
-                FIELD_CONVERSATION_TYPE,
-                SearchOp::Eq,
-                SearchValue::String(conversation_type),
-            );
+            criteria = criteria.eq(FIELD_CONVERSATION_TYPE, conversation_type);
         }
         if let Some(llm) = query.llm {
-            criteria.add_condition(FIELD_LLM, SearchOp::Eq, SearchValue::String(llm));
+            criteria = criteria.eq(FIELD_LLM, llm);
         }
         if let Some(from_date) = query.from_date {
-            criteria.add_condition(
-                FIELD_LAST_UPDATED_AT,
-                SearchOp::Gte,
-                SearchValue::DateTime(from_date),
-            );
+            criteria = criteria.gte(FIELD_LAST_UPDATED_AT, from_date);
         }
         if let Some(to_date) = query.to_date {
-            criteria.add_condition(
-                FIELD_LAST_UPDATED_AT,
-                SearchOp::Lte,
-                SearchValue::DateTime(to_date),
-            );
+            criteria = criteria.lte(FIELD_LAST_UPDATED_AT, to_date);
         }
 
         repo.find(Some(criteria)).await
@@ -131,13 +107,7 @@ impl BootStorageManager {
             return Err(anyhow::anyhow!("Error getting Conversation Repository",));
         };
         let mut repo = repo.lock().await;
-        let mut criteria = SearchCriteria::new();
-        criteria.add_condition(
-            FIELD_UID,
-            SearchOp::Eq,
-            SearchValue::String(uid.to_string()),
-        );
-        criteria.add_condition(FIELD_ID, SearchOp::Eq, SearchValue::String(id.to_string()));
+        let criteria = SearchCriteria::new().eq(FIELD_UID, uid).eq(FIELD_ID, id);
         repo.find_one(Some(criteria)).await
     }
 
@@ -146,18 +116,9 @@ impl BootStorageManager {
             return Err(anyhow::anyhow!("Error getting Turn Repository",));
         };
         let mut repo = repo.lock().await;
-        let mut criteria = SearchCriteria::new();
-        criteria.add_condition(
-            FIELD_UID,
-            SearchOp::Eq,
-            SearchValue::String(uid.to_string()),
-        );
-        criteria.add_condition(
-            FIELD_CONVERSATION_ID,
-            SearchOp::Eq,
-            SearchValue::String(conversation_id.to_string()),
-        );
-
+        let criteria = SearchCriteria::new()
+            .eq(FIELD_UID, uid)
+            .eq(FIELD_CONVERSATION_ID, conversation_id);
         repo.find(Some(criteria)).await
     }
 

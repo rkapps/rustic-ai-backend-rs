@@ -23,13 +23,10 @@ tower-http.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 
-agentic-boot.workspace = true
-agentic-core.workspace = true
-storage-core.workspace = true
+rustic-boot.workspace=true
+rustic-agent.workspace=true
+rustic-core.workspace=true
+rustic-storage.workspace = true
 fin-analyse.workspace = true
 fin-storage.workspace = true
 
-#rustic-ai-domain.workspace = true
-#rustic-ai-services.workspace = true
-#rustic-ai-storage.workspace = true
-#bin-shared = { path = "../shared" }

@@ -82,6 +82,15 @@ pub fn cosine_similarity(vec_a: &[f32], vec_b: &[f32]) -> f32;
 | `async-trait` | Async methods in traits |
 | `anyhow` | Error handling |
 
+## Imports
+
+Commonly used types are re-exported at the crate root for convenience:
+
+```rust
+use rustic_ml::{EmbeddingClient, Embedding, BatchResult};
+use rustic_ml::{cosine_similarity, search};
+```
+
 ## Running tests
 
 Candle test uses a locally cached model (path is hardcoded in the test).  
