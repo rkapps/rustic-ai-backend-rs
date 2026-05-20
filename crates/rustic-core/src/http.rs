@@ -16,7 +16,6 @@
 //! }
 //! ```
 
-
 use anyhow::Result;
 use reqwest::{Client, header::HeaderMap};
 use tracing::{debug, error, trace};
@@ -50,7 +49,6 @@ impl HttpClient {
             client: Client::new(),
         })
     }
-
 
     /// Sends an HTTP POST request and deserializes the response.
     ///
@@ -196,8 +194,6 @@ impl HttpClient {
             }
         }
     }
-
-
 
     /// Send a fire-and-forget POST request where the response body is ignored.
     ///
