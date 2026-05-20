@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::extract::FromRef;
+use rustic_boot::BootState;
 
 #[derive(Clone)]
 pub struct AppState {

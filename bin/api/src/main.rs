@@ -50,19 +50,19 @@ async fn main() -> Result<()> {
     let mongo_uri = env::var("MONGO_URI").expect("MONGO_URI envrionment variable not set");
 
     let tools: Vec<Arc<dyn Tool>> = vec![
-        // Arc::new(TickerScreeningTool::new(
-        //     storage_service.clone(),
-        //     embedding_client,
-        // )),
-        // Arc::new(TickerTaxonomyTool::new(storage_service.clone())),
-        // // Arc::new(TickerSentimentTool::new(
-        // //     query_embedding.clone(),
-        // //     storage_service.clone(),
-        // // )),
-        // Arc::new(TickerSnapshotTool::new(storage_service.clone())),
-        // Arc::new(TickerPriceHistoryTool::new(storage_service.clone())),
-        // Arc::new(TickerIndicatorTool::new(storage_service.clone())),
-        // Arc::new(TickerPeersTool::new(storage_service.clone())),
+        Arc::new(TickerScreeningTool::new(
+            storage_service.clone(),
+            embedding_client,
+        )),
+        Arc::new(TickerTaxonomyTool::new(storage_service.clone())),
+        Arc::new(TickerSentimentTool::new(
+            query_embedding.clone(),
+            storage_service.clone(),
+        )),
+        Arc::new(TickerSnapshotTool::new(storage_service.clone())),
+        Arc::new(TickerPriceHistoryTool::new(storage_service.clone())),
+        Arc::new(TickerIndicatorTool::new(storage_service.clone())),
+        Arc::new(TickerPeersTool::new(storage_service.clone())),
     ];
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
