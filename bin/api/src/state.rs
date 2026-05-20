@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use agentic_boot::startup::boot::BootState;
 use anyhow::Result;
 use axum::extract::FromRef;
 

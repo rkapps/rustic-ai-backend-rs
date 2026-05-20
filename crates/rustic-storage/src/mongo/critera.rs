@@ -136,12 +136,7 @@ mod tests {
     #[test]
     fn test_builder_filter_equality() -> Result<()> {
         let sector = "Technology";
-        let mut criteria = SearchCriteria::new();
-        criteria.add_condition(
-            "sector",
-            SearchOp::Eq,
-            SearchValue::String(sector.to_string()),
-        );
+        let criteria = SearchCriteria::new().eq("sector", sector.to_string());
         let filter = MongoCriteriaBuilder::build_filter(&criteria);
 
         let expected = doc! { "sector": "Technology" };
@@ -153,8 +148,8 @@ mod tests {
     #[test]
     fn test_build_filter_greater_than_or_equal() {
         let min_cap = 100000000;
-        let mut criteria = SearchCriteria::new();
-        criteria.add_condition("market_cap", SearchOp::Gte, SearchValue::Int(min_cap));
+        let criteria = SearchCriteria::new().gte("total_assets", min_cap);
+        // criteria.add_condition("market_cap", SearchOp::Gte, SearchValue::Int(min_cap));
         let filter = MongoCriteriaBuilder::build_filter(&criteria);
 
         let expected = doc! {
@@ -168,15 +163,18 @@ mod tests {
     #[test]
     fn test_build_filter_range_gte_and_lte() {
         // Arrange: Range query (price between 100 and 500)
-        let mut criteria = SearchCriteria::new();
+        let criteria = SearchCriteria::new()
+            .eq("symbol", "AAPL".to_string())
+            .gte("price", 100)
+            .lte("price", 500);
 
-        criteria.add_condition(
-            "symbol",
-            SearchOp::Eq,
-            SearchValue::String("AAPL".to_string()),
-        );
-        criteria.add_condition("price", SearchOp::Gte, SearchValue::Int(100));
-        criteria.add_condition("price", SearchOp::Lte, SearchValue::Int(500));
+        // criteria.add_condition(
+        //     "symbol",
+        //     SearchOp::Eq,
+        //     SearchValue::String("AAPL".to_string()),
+        // );
+        // criteria.add_condition("price", SearchOp::Gte, SearchValue::Int(100));
+        // criteria.add_condition("price", SearchOp::Lte, SearchValue::Int(500));
 
         // Act
         let filter = MongoCriteriaBuilder::build_filter(&criteria);
