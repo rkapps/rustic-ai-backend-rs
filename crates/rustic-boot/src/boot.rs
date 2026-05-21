@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use axum::{Router, extract::FromRef, http::HeaderValue};
 use reqwest::{Method, StatusCode, header};
 use rustic_agent::{
-    client::{mcp::MCPServerAdapter, tools::Tool},
+    client::mcp::MCPServerAdapter,
     services::{
         agent::AgentService,
         config::{
@@ -15,6 +15,7 @@ use rustic_agent::{
     },
     tools::{mcp::MCPRegistry, tool::ToolRegistry},
 };
+use rustic_core::Tool;
 use tokio::{net::TcpListener, sync::RwLock};
 use tower_http::cors::CorsLayer;
 use tracing::{error, info, warn};

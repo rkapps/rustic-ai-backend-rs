@@ -10,7 +10,9 @@
 pub mod error;
 pub mod http;
 pub mod logger;
+pub mod agents;
 
 pub use error::HttpError;
 pub use http::{HttpClient, HttpResponse, HttpResult};
 pub use logger::set_logger;
+pub use agents::tools::Tool;

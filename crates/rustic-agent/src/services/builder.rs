@@ -1,10 +1,11 @@
 use anyhow::{Context, Result};
+use rustic_core::Tool;
 use std::sync::Arc;
 
 use crate::{
     MCPRegistry, ToolRegistry, agents::Agent, client::{
         llm::LlmClient, mcp::MCPServerAdapter, preset::Preset, provider::Provider,
-        request::ReasoningEffort, tools::Tool,
+        request::ReasoningEffort, 
     }, providers::{
         anthropic::{self, completion::AnthropicClient},
         gemini::{self, completion::GeminiClient},

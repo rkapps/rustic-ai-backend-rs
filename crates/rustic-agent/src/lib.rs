@@ -45,6 +45,6 @@ pub use client::response::{
 };
 
 // Tool types
-pub use client::tools::{Tool, ToolCallRequest, ToolDefinition};
+pub use client::tools::{ToolCallRequest, ToolDefinition};
 pub use tools::mcp::MCPRegistry;
 pub use tools::tool::ToolRegistry;

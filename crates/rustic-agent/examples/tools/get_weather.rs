@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use rustic_agent::client::tools::Tool;
+use rustic_core::Tool;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 

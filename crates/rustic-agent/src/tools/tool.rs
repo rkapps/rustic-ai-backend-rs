@@ -1,5 +1,6 @@
-use crate::client::tools::Tool;
 use std::{collections::HashMap, sync::Arc};
+
+use rustic_core::Tool;
 
 /// In-process tool registry used by [`Agent`](crate::agents::Agent) to dispatch tool calls.
 ///
