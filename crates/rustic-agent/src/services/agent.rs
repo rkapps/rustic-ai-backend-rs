@@ -124,6 +124,21 @@ impl AgentService {
             }
             filtered
         };
+
+        // filter MCP tools — only include ones in agent_config.tools
+        let mcp_registry = {
+            let global = self.mcp_registry.read().await;
+            let mut filtered = MCPRegistry::new();
+            for tool_id in &agent_config.tools {
+                if tool_id.contains("___") {
+                    if let Some(def) = global.get_tool(tool_id) {
+                        filtered.definitions.insert(tool_id.clone(), def);
+                    }
+                }
+            }
+            filtered
+        };
+
         trace!("System Prompt: {}", agent_config.system_prompt);
         debug!("Tools: {}", tool_registry.get_tools().len());
         debug!("Preset: {:?}", preset);
@@ -132,6 +147,7 @@ impl AgentService {
             .builder()
             .with_system_prompt(agent_config.system_prompt.clone())
             .with_tools(tool_registry.get_tools())
+            .with_filtered_mcp(mcp_registry)
             .with_preset(preset)
             .with_provider(provider)
             .await?

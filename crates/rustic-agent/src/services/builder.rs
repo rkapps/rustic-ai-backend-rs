@@ -2,19 +2,15 @@ use anyhow::{Context, Result};
 use std::sync::Arc;
 
 use crate::{
-    agents::Agent,
-    client::{
+    MCPRegistry, ToolRegistry, agents::Agent, client::{
         llm::LlmClient, mcp::MCPServerAdapter, preset::Preset, provider::Provider,
         request::ReasoningEffort, tools::Tool,
-    },
-    providers::{
+    }, providers::{
         anthropic::{self, completion::AnthropicClient},
         gemini::{self, completion::GeminiClient},
         local::completion::LocalClient,
         openai::{self, completion::OpenAIClient},
-    },
-    services::agent::AgentService,
-    tools::mcp::MCPServerSetting,
+    }, services::agent::AgentService, tools::mcp::MCPServerSetting
 };
 
 const MODEL_TEMPERATURE: f32 = 0.5;
@@ -46,6 +42,7 @@ pub struct AgentBuilder<'a> {
     reasoning_effort: ReasoningEffort,
     /// Tools accumulated via `with_tool*` — registered into the shared registry on `build`.
     pending_tools: Vec<Arc<dyn Tool>>,
+    filtered_mcp: Option<MCPRegistry>,
 }
 
 impl<'a> AgentBuilder<'a> {
@@ -62,6 +59,7 @@ impl<'a> AgentBuilder<'a> {
             enable_cache: false,
             reasoning_effort: ReasoningEffort::None,
             pending_tools: Vec::new(),
+            filtered_mcp: None,
         }
     }
 
@@ -163,6 +161,11 @@ impl<'a> AgentBuilder<'a> {
             .register_server_with_adapter(setting, Box::new(adapter))
             .await?;
         Ok(self)
+    }
+
+    pub fn with_filtered_mcp(mut self, registry: MCPRegistry) -> Self {
+        self.filtered_mcp = Some(registry);
+        self
     }
 
     /// Register a single tool from an already-registered MCP server into the shared registry.
@@ -272,18 +275,23 @@ impl<'a> AgentBuilder<'a> {
         let max_tokens = self.max_tokens.unwrap_or(MODEL_MAX_TOKENS);
         let system_prompt = self.system_prompt;
 
-        // Register pending tools first
-        if !self.pending_tools.is_empty() {
-            let mut tool_write_guard = self.service.tool_registry.write().await;
+        let tool_registry = {
+            let mut registry = ToolRegistry::new();
             for tool in self.pending_tools {
-                tool_write_guard.register_tool_boxed(tool);
+                registry.register_tool_boxed(tool);
             }
-        } // write guard dropped here
+            Arc::new(registry)
+        };        
+        // let mcp_tool_guard = self.service.mcp_registry.read().await;
+        // let mcp_registry = Arc::new(mcp_tool_guard.clone());
 
-        let tool_guard = self.service.tool_registry.read().await;
-        let tool_registry = tool_guard.clone().into();
-        let mcp_tool_guard = self.service.mcp_registry.read().await;
-        let mcp_registry = Arc::new(mcp_tool_guard.clone());
+        // use filtered MCP if provided, otherwise use full shared registry
+        let mcp_registry = if let Some(filtered) = self.filtered_mcp {
+            Arc::new(filtered)
+        } else {
+            let mcp_tool_guard = self.service.mcp_registry.read().await;
+            Arc::new(mcp_tool_guard.clone())
+        };
 
         let reasoning_effort = self.reasoning_effort;
         let enable_cache = self.enable_cache;
