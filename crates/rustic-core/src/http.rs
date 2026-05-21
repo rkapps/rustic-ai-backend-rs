@@ -50,6 +50,56 @@ impl HttpClient {
         })
     }
 
+    /// Send an HTTP GET request and deserialize the JSON response body into `T`.
+    ///
+    /// # Arguments
+    ///
+    /// * `url`     - The endpoint URL.
+    /// * `headers` - Optional additional request headers (e.g. auth tokens).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails to send, the server returns a
+    /// non-2xx status code, or the response body cannot be deserialized into `T`.
+    ///
+    /// > **Note:** this method returns `anyhow::Result` rather than [`HttpResult`];
+    /// > errors are not mapped to typed [`HttpError`] variants.
+    pub async fn get_request<T: serde::de::DeserializeOwned + Send>(
+        &self,
+        url: String,
+        headers: Option<reqwest::header::HeaderMap>,
+    ) -> Result<T> {
+        trace!("→ GET {}", url);
+
+        let mut request = self.client.get(url);
+
+        if let Some(h) = headers {
+            request = request.headers(h);
+        }
+
+        let response = request.send().await?;
+        let status = response.status();
+        let text = response.text().await?;
+
+        trace!("← {} {}", status, text);
+
+        // handle errors before attempting deserialization
+        if status.is_client_error() || status.is_server_error() {
+            error!("HTTP {} error: {}", status, text);
+            return Err(anyhow::anyhow!("HTTP {} error: {}", status, text));
+        }
+
+        // include raw body in deserialization errors
+        serde_json::from_str::<T>(&text).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to deserialize response: {}\nStatus: {}\nBody: {}",
+                e,
+                status,
+                text
+            )
+        })
+    }
+
     /// Sends an HTTP POST request and deserializes the response.
     ///
     /// # Arguments
