@@ -12,7 +12,7 @@
 //! - [`collections`] – persisted metadata for registered collections.
 //! - [`database`] – [`database::FileDatabase`] manages multiple collections.
 //! - [`errors`] – error types specific to this backend.
-//! - [`file`] – low-level binary record format (header, CRC, BSON payload).
+//! - [`record`] – low-level binary record format (header, CRC, BSON payload).
 //! - [`repository`] – [`repository::FileRepository`] implements [`crate::core::repository::Repository`].
 //! - [`sort`] – in-memory multi-key sort helper.
 //! - [`utils`] – path-building utilities.
@@ -20,7 +20,7 @@
 pub mod collections;
 pub mod database;
 pub mod errors;
-pub mod file;
+pub mod record;
 pub mod repository;
 pub mod sort;
 pub mod utils;

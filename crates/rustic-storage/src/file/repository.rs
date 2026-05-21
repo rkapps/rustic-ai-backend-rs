@@ -5,12 +5,15 @@ use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{Seek, SeekFrom};
 use std::marker::PhantomData;
+use std::path::Path;
 use std::{fmt::Debug, path::PathBuf};
 use tracing::{debug, info};
 
 use crate::core::repository::{RepoKey, RepoModel, Repository, Searchable, VectorEmbedding};
 use crate::core::search::SearchCriteria;
-use crate::file::file::{RECORD_TYPE_ACTIVE, RECORD_TYPE_DELETED, read_record, write_active_record};
+use crate::file::record::{
+    RECORD_TYPE_ACTIVE, RECORD_TYPE_DELETED, read_record, write_active_record,
+};
 use crate::file::sort::apply_sort;
 
 /// Append-only flat-file implementation of [`Repository`].
@@ -62,7 +65,7 @@ where
         })
     }
 
-    fn file_path(name: &str, collection_path: &PathBuf) -> PathBuf {
+    fn file_path(name: &str, collection_path: &Path) -> PathBuf {
         collection_path.join(format!("{}.bin", &name))
     }
 
