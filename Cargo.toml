@@ -61,10 +61,10 @@ rustic-providers = { path = "crates/rustic-providers" }
 rustic-storage = { path = "crates/rustic-storage" }
 rustic-tools = { path = "crates/rustic-tools" }
 
-#fin-analyse = { path = "../fin-tracker-backend-rs/crates/fin-analyse" }
+fin-analyse = { path = "../fin-tracker-backend-rs/crates/fin-analyse" }
 #fin-storage = { path = "../fin-tracker-backend-rs/crates/fin-storage" }
 
-fin-analyse = { git = "https://github.com/rkapps/fin-tracker-backend-rs", package = "fin-analyse"}
+#fin-analyse = { git = "https://github.com/rkapps/fin-tracker-backend-rs", package = "fin-analyse"}
 fin-storage = { git = "https://github.com/rkapps/fin-tracker-backend-rs", package = "fin-storage"}
 fin-domain = { git = "https://github.com/rkapps/fin-tracker-backend-rs", package = "fin-domain"}
 

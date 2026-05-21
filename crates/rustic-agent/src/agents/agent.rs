@@ -292,7 +292,7 @@ impl Agent {
     /// tools beyond the iteration cap.
     pub async fn complete_with_tools(
         &self,
-        messages: &Vec<Message>,
+        messages: &[Message],
     ) -> HttpResult<CompletionResponse> {
         let mut definitions: Vec<ToolDefinition> = self
             .tool_registry
@@ -313,7 +313,7 @@ impl Agent {
         let request = CompletionRequest {
             model: self.model.clone(),
             system: self.system_prompt.clone(),
-            messages: messages.clone(),
+            messages: messages.to_vec(),
             temperature: self.temperature,
             max_tokens: self.max_tokens,
             stream: false,

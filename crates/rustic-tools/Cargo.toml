@@ -10,8 +10,9 @@ async-trait.workspace=true
 chrono.workspace=true
 serde.workspace=true
 serde_json.workspace=true
+tracing.workspace=true
 
 
 #local crates
-rustic-agent.workspace=true
 rustic-providers.workspace=true
+rustic-core.workspace=true

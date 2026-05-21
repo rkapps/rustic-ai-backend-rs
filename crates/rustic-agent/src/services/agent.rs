@@ -1,11 +1,12 @@
 use anyhow::Result;
+use rustic_tools::OrchestratorStageDecision;
 use std::{collections::HashMap, sync::Arc};
 use tracing::{debug, trace};
 
 use tokio::sync::RwLock;
 
 use crate::{
-    agents::Agent,
+    agents::{Agent, Orchestrator},
     client::{llm::LlmClient, preset::Preset, provider::Provider},
     services::{
         builder::AgentBuilder,
@@ -157,6 +158,44 @@ impl AgentService {
         Ok(agent)
     }
 
+
+    pub async fn build_orchestrator(
+        &self,
+        agent_id: &str,
+        llm: &str,
+        model: &str,
+    ) -> Result<Orchestrator> {
+        let agent_config = self
+            .agent_registry
+            .find(agent_id)
+            .ok_or_else(|| anyhow::anyhow!("Agent '{}' not found", agent_id))?;
+
+        debug!("Agent Config: {}", agent_config.id);
+        let provider = self.resolve_provider(llm, Some(model))?;
+        let preset = match &provider {
+            Provider::Local { .. } => Preset::Local,
+            _ => Preset::Balanced,
+        };
+
+        let tool = OrchestratorStageDecision{};
+        let mut tool_registry = ToolRegistry::new();
+        tool_registry.register_tool(tool);
+
+        let agent = self
+            .builder()
+            .with_system_prompt(agent_config.system_prompt.clone())
+            .with_tools(tool_registry.get_tools())
+            .with_preset(preset)
+            .with_provider(provider)
+            .await?
+            .build()
+            .await?;
+        let orchestrator = Orchestrator::new(agent);
+        Ok(orchestrator)
+    }
+
+
+    
     /// Resolve a [`Provider`] enum variant from a provider ID and optional model override.
     ///
     /// Falls back to the provider's `default_model` when `model` is `None`.

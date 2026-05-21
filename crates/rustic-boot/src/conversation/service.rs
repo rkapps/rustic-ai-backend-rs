@@ -1,13 +1,14 @@
 use anyhow::Result;
 use chrono::Utc;
 use rustic_agent::{
-    agents::Agent,
+    CompletionResponse,
+    agents::{Agent, agent},
     client::{
         llm::CompletionStreamResponse,
         message::Message,
         response::{CompletionResponseContent, CompletionResponseTokenUsage},
     },
-    services::agent::AgentService,
+    services::{agent::AgentService, config::agent::ExecutionType},
 };
 use std::sync::Arc;
 use tracing::debug;
@@ -179,8 +180,8 @@ impl ConversationService {
         };
         messages.push(nmessage);
 
-        let agent = self.build_conversation_agent(&conversation).await?;
-        let cresponse = agent.complete(&messages).await?;
+        let cresponse = self.run_conversation(&conversation, &messages).await?;
+        // let cresponse = agent.complete(&messages).await?;
 
         let mut rcontent = String::new();
         let response = cresponse.clone();
@@ -239,21 +240,30 @@ impl ConversationService {
         };
         messages.push(nmessage);
 
-        let agent = self.build_conversation_agent(&conversation).await?;
-        let stream = agent.complete_with_tools_streaming(&messages).await?;
+        let stream = self
+            .run_conversation_streaming(&conversation, &messages)
+            .await?;
+        // let stream = agent.complete_with_tools_streaming(&messages).await?;
         Ok(Box::pin(stream))
     }
 
-    pub async fn build_conversation_agent(&self, conversation: &Conversation) -> Result<Agent> {
+    pub async fn run_conversation(
+        &self,
+        conversation: &Conversation,
+        messages: &[Message],
+    ) -> Result<CompletionResponse> {
         match conversation.conversation_type {
             ConversationType::Chat => {
-                self.agent_service
+                let agent = self
+                    .agent_service
                     .build_chat_agent(
                         &conversation.llm,
                         &conversation.model,
                         conversation.system_prompt.clone(),
                     )
-                    .await
+                    .await?;
+                let response = agent.complete_with_tools(messages).await?;
+                Ok(response)
             }
             ConversationType::Agent => {
                 let agent_id = conversation
@@ -261,9 +271,99 @@ impl ConversationService {
                     .as_deref()
                     .ok_or_else(|| anyhow::anyhow!("Agent conversation missing agent_id"))?;
 
-                self.agent_service
+                let agent_config = self
+                    .agent_service
+                    .agent_registry
+                    .find(agent_id)
+                    .ok_or_else(|| anyhow::anyhow!("Agent '{}' not found", agent_id))?;
+
+                match agent_config.execution {
+                    ExecutionType::SingleAgent => {
+                        let agent = self
+                            .agent_service
+                            .build_agent_for_id(agent_id, &conversation.llm, &conversation.model)
+                            .await?;
+                        let response = agent.complete_with_tools(messages).await?;
+                        Ok(response)
+                    }
+                    ExecutionType::Pipeline => {
+                        let agent = self
+                            .agent_service
+                            .build_orchestrator(agent_id, &conversation.llm, &conversation.model)
+                            .await?;
+                        let response = agent.execute(messages).await?;
+                        Ok(response)
+                    }
+                    ExecutionType::PipelineAgent => {
+                        Err(anyhow::anyhow!("Pipeline agent cannot be executed"))
+                    }
+                }
+                // let agent = self
+                //     .agent_service
+                //     .build_agent_for_id(agent_id, &conversation.llm, &conversation.model)
+                //     .await?;
+                // let response = agent.complete_with_tools(messages).await?;
+                // Ok(response)
+            }
+        }
+    }
+
+    pub async fn run_conversation_streaming(
+        &self,
+        conversation: &Conversation,
+        messages: &[Message],
+    ) -> Result<CompletionStreamResponse> {
+        match conversation.conversation_type {
+            ConversationType::Chat => {
+                let agent = self
+                    .agent_service
+                    .build_chat_agent(
+                        &conversation.llm,
+                        &conversation.model,
+                        conversation.system_prompt.clone(),
+                    )
+                    .await?;
+                let stream = agent.complete_with_tools_streaming(messages).await?;
+                Ok(Box::pin(stream))
+            }
+            ConversationType::Agent => {
+                let agent_id = conversation
+                    .agent_id
+                    .as_deref()
+                    .ok_or_else(|| anyhow::anyhow!("Agent conversation missing agent_id"))?;
+
+                let agent_config = self
+                    .agent_service
+                    .agent_registry
+                    .find(agent_id)
+                    .ok_or_else(|| anyhow::anyhow!("Agent '{}' not found", agent_id))?;
+
+                let agent = self
+                    .agent_service
                     .build_agent_for_id(agent_id, &conversation.llm, &conversation.model)
-                    .await
+                    .await?;
+                let stream = agent.complete_with_tools_streaming(messages).await?;
+                Ok(Box::pin(stream))
+
+                // match agent_config.execution {
+                //     ExecutionType::SingleAgent => {
+                //         let agent = self
+                //         .agent_service
+                //         .build_agent_for_id(agent_id, &conversation.llm, &conversation.model)
+                //         .await?;
+                //     let stream = agent.complete_with_tools_streaming(messages).await?;
+                //     Ok(Box::pin(stream))
+
+                //     }
+                //     ExecutionType::Pipeline => {
+                //         let agent = self
+                //         .agent_service
+                //         .build_orchestrator(agent_id, &conversation.llm, &conversation.model)
+                //         .await?;
+                //     let stream = agent.complete_with_tools_streaming(messages).await?;
+                //     Ok(Box::pin(stream))
+                //     }
+                // }
             }
         }
     }
