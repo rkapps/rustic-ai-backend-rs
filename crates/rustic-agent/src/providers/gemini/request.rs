@@ -8,7 +8,10 @@ use crate::{
         request::{CompletionRequest, ReasoningEffort},
         tools::ToolDefinition,
     },
-    providers::gemini::MODEL_GEMINI_3_FLASH_PREVIEW,
+    providers::gemini::{
+        MODEL_GEMINI_3_FLASH_PREVIEW,
+        helper::clean_for_gemini,
+    },
 };
 
 /// Serialized body sent to `POST /v1beta/interactions`.
@@ -190,7 +193,22 @@ impl GeminiInteractionsRequest {
             previous_interaction_id: id,
             stream: request.stream,
             generation_config: GeminiCompletionRequestConfig::new(&crequest),
-            tools: request.definitions,
+            tools: request
+                .definitions
+                .into_iter()
+                .map(|mut def| {
+                    // clean top-level description
+                    def.description = def
+                        .description
+                        .replace('\n', " ")
+                        .split_whitespace()
+                        .collect::<Vec<&str>>()
+                        .join(" ");
+                    // clean parameters recursively (handles nested descriptions too)
+                    def.parameters = clean_for_gemini(&def.parameters);
+                    def
+                })
+                .collect(),
         };
         Ok(grequest)
     }

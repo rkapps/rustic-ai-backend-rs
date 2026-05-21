@@ -1,6 +1,7 @@
 //! Google Gemini provider: request mapping to the Interactions API, streaming SSE parsing, and response normalisation.
 
 pub mod completion;
+pub mod helper;
 pub mod request;
 pub mod response;
 
