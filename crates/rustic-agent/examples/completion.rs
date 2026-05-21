@@ -68,6 +68,7 @@ async fn main() -> Result<()> {
     };
     messages.push(message);
 
+    println!("complete start---");
     let response = agent.complete(&messages).await?;
     println!("Response: {:#?}", response);
 

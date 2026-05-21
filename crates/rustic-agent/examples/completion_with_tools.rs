@@ -18,6 +18,7 @@ use rustic_agent::{
     providers::gemini::{self, completion::GeminiClient},
     tools::{mcp::MCPRegistry, tool::ToolRegistry},
 };
+use rustic_core::set_logger;
 
 use std::{env, sync::Arc};
 
@@ -25,6 +26,14 @@ use crate::tools::get_weather::GetWeatherTool;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+
+
+    let filter = std::env::var("RUST_LOG").unwrap_or_else(|_| {
+        "rustic_ai_api=debug,rustic_boot=info,rustic_agent=debug,fin_analyse=info".to_string()
+    });
+    set_logger(filter);
+
+
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY envrionment variable not set");
     let client = GeminiClient::new(api_key.to_string())
         .with_context(|| anyhow::anyhow!("Error creating Anthropic client"))?;
@@ -52,7 +61,7 @@ async fn main() -> Result<()> {
         content: content.clone(),
         response_id: None,
     };
-
+    println!("completion start---");
     let response = agent.complete_with_tools(&vec![message]).await?;
     println!("Response: {:#?}", response);
 

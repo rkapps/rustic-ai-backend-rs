@@ -20,3 +20,7 @@ tracing.workspace=true
 
 # local crates
 rustic-core.workspace=true
+
+[[example]]
+name = "completion"
+path = "examples/completion.rs"
