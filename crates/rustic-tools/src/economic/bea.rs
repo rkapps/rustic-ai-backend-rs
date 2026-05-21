@@ -1,6 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use rustic_agent::Tool;
+use rustic_core::Tool;
 use rustic_providers::BeaClient;
 use serde_json::{Value, json};
 use std::sync::Arc;
