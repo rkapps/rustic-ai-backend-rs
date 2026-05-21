@@ -3337,6 +3337,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustic-providers"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "rustic-core",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "rustic-storage"
 version = "0.1.0"
 dependencies = [
@@ -3356,6 +3369,19 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "rustic-tools"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "rustic-agent",
+ "rustic-providers",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
