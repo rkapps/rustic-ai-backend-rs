@@ -17,6 +17,8 @@ use rustic_boot::{
 };
 use rustic_core::logger::set_logger;
 use rustic_ml::embeddings::openai::OpenAIEmbeddingClient;
+use rustic_providers::{BeaClient, CensusClient, FredClient};
+use rustic_tools::{BeaTool, CensusTool, FredTool};
 use tracing::debug;
 
 #[tokio::main]
@@ -50,6 +52,16 @@ async fn main() -> Result<()> {
         env::var("RUSTIC_AI_DB_NAME").expect("RUSTIC_AI_DB_NAME envrionment variable not set");
     let mongo_uri = env::var("MONGO_URI").expect("MONGO_URI envrionment variable not set");
 
+    let fred_api_key = env::var("FRED_API_KEY").expect("FRED_API_KEY environment variable not set");
+    let fred_client = Arc::new(FredClient::new(fred_api_key)?);
+
+    let census_api_key = env::var("CENSUS_API_KEY").expect("CENSUS_API_KEY environment variable not set");
+    let census_client = Arc::new(CensusClient::new(census_api_key)?);
+
+    let bea_api_key = env::var("BEA_API_KEY").expect("BEA_API_KEY environment variable not set");
+    let bea_client = Arc::new(BeaClient::new(bea_api_key)?);
+
+
     let tools: Vec<Arc<dyn Tool>> = vec![
         Arc::new(TickerScreeningTool::new(
             storage_service.clone(),
@@ -64,6 +76,9 @@ async fn main() -> Result<()> {
         Arc::new(TickerPriceHistoryTool::new(storage_service.clone())),
         Arc::new(TickerIndicatorTool::new(storage_service.clone())),
         Arc::new(TickerPeersTool::new(storage_service.clone())),
+        Arc::new(FredTool::new(fred_client)),
+        Arc::new(CensusTool::new(census_client)),
+        Arc::new(BeaTool::new(bea_client)),
     ];
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
