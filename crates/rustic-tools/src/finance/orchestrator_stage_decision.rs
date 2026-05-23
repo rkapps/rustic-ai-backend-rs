@@ -3,7 +3,6 @@ use async_trait::async_trait;
 use rustic_core::Tool;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tracing::info;
 
 
 #[derive(Debug, Serialize, Clone)]
@@ -65,10 +64,9 @@ impl Tool for OrchestratorStageDecision {
     }
 
     async fn execute(&self, value: serde_json::Value) -> Result<Value> {
-        let stage_decision: StageDecision = serde_json::from_value(value.clone())
-            .map_err(|e| anyhow::anyhow!("Error deserializing arguments {:#?}: {}", value, e))?;
-
-        info!("STage decison: {:?}", stage_decision);
+        // let stage_decision: StageDecision = serde_json::from_value(value.clone())
+        //     .map_err(|e| anyhow::anyhow!("Error deserializing arguments {:#?}: {}", value, e))?;
+        // info!("STage decison: {:?}", stage_decision);
         Ok(value)
     }
 }
