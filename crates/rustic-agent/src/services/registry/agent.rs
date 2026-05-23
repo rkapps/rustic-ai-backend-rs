@@ -59,16 +59,15 @@ impl AgentRegistry {
     ///
     /// Returns an empty vec if the agent is not a pipeline or has no available agents configured.
     pub fn sub_agents(&self, agent_id: &str) -> Vec<AgentConfig> {
-        let available = self
+        let available_ids: Vec<&str> = self
             .find(agent_id)
             .and_then(|a| a.pipeline.as_ref())
-            .and_then(|p| p.available_agents.as_ref())
-            .map(|v| v.as_slice())
-            .unwrap_or(&[]);
+            .map(|p| p.available_agents.iter().map(|a| a.id.as_str()).collect())
+            .unwrap_or_default();
 
         self.agents
             .iter()
-            .filter(|a| available.contains(&a.id))
+            .filter(|a| available_ids.contains(&a.id.as_str()))
             .cloned()
             .collect()
     }

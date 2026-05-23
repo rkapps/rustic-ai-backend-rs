@@ -147,7 +147,7 @@ impl Agent {
             });
             let mut usage = crate::client::response::CompletionResponseTokenUsage::default();
 
-            debug!("Message: {:#?} ", current_messages);
+            trace!("Message: {:#?} ", current_messages);
 
             loop {
                 iteration += 1;
@@ -302,13 +302,13 @@ impl Agent {
             .map(|e| ToolDefinition::from_tool(e.as_ref()))
             .collect();
         debug!("Message: {:#?}", messages);
-        debug!("too definitions: {:#?}", definitions);
+        trace!("too definitions: {:#?}", definitions);
         let mcp_definitions = self.mcp_registry.definitions.clone();
         mcp_definitions
             .iter()
             .for_each(|e| definitions.push(e.1.clone()));
         // debug!("All definitions: {:#?}", definitions);
-        debug!("Mcp_definitions: {:#?}", mcp_definitions);
+        trace!("Mcp_definitions: {:#?}", mcp_definitions);
 
         let request = CompletionRequest {
             model: self.model.clone(),
@@ -340,7 +340,7 @@ impl Agent {
                 return Err(HttpError::MaxIterationsExceeded);
             }
 
-            debug!("CompletionRequest: {:#?}", nrequest);
+            trace!("CompletionRequest: {:#?}", nrequest);
 
             // Call the llm with the request
             let response = self.client.complete(nrequest.clone()).await?;
@@ -359,7 +359,7 @@ impl Agent {
                 .collect();
 
             if tool_calls.is_empty() {
-                info!("CompletionResponse: {:#?}", response);
+                debug!("CompletionResponse: {:#?}", response.text());
                 return Ok(response); // Done - return final answer
             }
 
@@ -411,11 +411,10 @@ impl Agent {
             //Add thoughts to the messages first
             let mut nmessages: Vec<Message> = Vec::new();
             nmessages.extend(thoughts);
-            debug!("before results loop");
             for result in results {
                 match result {
                     Ok((tool_call, tool_output)) => {
-                        debug!("Tool Call: {:?}", tool_call);
+                        trace!("Tool Call: {:?}", tool_call);
                         debug!("     Output: {:?}", tool_output);
                         nmessages.push(tool_call);
                         nmessages.push(tool_output);
@@ -476,7 +475,6 @@ impl Agent {
             }
         };
 
-        debug!("Executed tool ended");
         let tool_output_message = Message::ToolOutput {
             call_id: call.id.clone(),
             output,

@@ -8,6 +8,7 @@ use rustic_agent::{
     services::{
         agent::AgentService,
         config::{
+            agent::{AgentConfig, ExecutionType},
             mcp::MCPServerConfig,
             provider::{ProviderConfig, ResolvedProvider},
         },
@@ -143,41 +144,38 @@ impl AgenticBootBuilder {
         // add chat templates
         info!("AgenticBootBuilder build...");
 
-        let mut chat_templates = Vec::new();
-        let config_dir = self.config_dir.unwrap_or_default();
-        let chat_templates_path = self.chat_templates_path;
-        let providers_path = self.providers_path;
-        let agents_config_path = self.agents_config_path;
-        let mcp_servers_config_path = self.mcp_servers_config_path;
-
-        let mongo_uri = self.mongo_uri;
-        let mongo_db = self.mongo_db;
-
-        let firebase_project_id = self.firebase_project_id.unwrap_or_default();
+        let config_dir = self.config_dir.clone().unwrap_or_default();
+        let firebase_project_id = self.firebase_project_id.clone().unwrap_or_default();
 
         // register tools
         let mut tool_registry = ToolRegistry::new();
-        for tool in self.tools {
+        for tool in &self.tools {
             info!("Tool: {:?}", tool.name());
-            tool_registry.register_tool_arc(tool);
+            tool_registry.register_tool_arc(tool.clone());
         }
 
         info!("Config directory: {:?}", config_dir);
         info!("Firebase project: {:}", firebase_project_id);
-        info!("Mongo Uri: {:?} db: {:?}", mongo_uri, mongo_db);
+        info!("Mongo Uri: {:?} db: {:?}", self.mongo_uri, self.mongo_db);
 
-        if let Some(path) = chat_templates_path {
-            let full_path = format!("{}/{}", config_dir, path);
-            info!("ChatTemplate path: {}", full_path);
-            chat_templates = load_chat_templates(full_path).await?;
-        }
+        let mongo_uri = &self.mongo_uri;
+        let mongo_db = &self.mongo_db;
 
-        // add the provider registry
+        // ── Chat Templates ────────────────────────────────────────────────────────
+        let chat_templates = match &self.chat_templates_path {
+            Some(path) => {
+                let full_path = format!("{}/{}", config_dir, path);
+                info!("ChatTemplate path: {}", full_path);
+                load_chat_templates(full_path).await?
+            }
+            None => vec![],
+        };
+
+        // ── Provider Registry ─────────────────────────────────────────────────────
         let mut provider_registry = ProviderRegistry::new();
-        if let Some(path) = providers_path {
+        if let Some(path) = &self.providers_path {
             let full_path = format!("{}/{}", config_dir, path);
             info!("ProviderConfig path: {}", full_path);
-
             let provider_configs = load_provider_config(full_path).await?;
             let resolved_providers = build_resolved_providers(&provider_configs)?;
             for provider in resolved_providers {
@@ -189,15 +187,15 @@ impl AgenticBootBuilder {
             }
         }
 
-        // load mcp servers
+        // ── MCP Registry ──────────────────────────────────────────────────────────
         let mut mcp_registry = MCPRegistry::new();
-
-        if let Some(path) = mcp_servers_config_path {
+        if let Some(path) = &self.mcp_servers_config_path {
             let full_path = format!("{}/{}", config_dir, path);
             info!("MCPServer config path: {}", full_path);
-            let mcp_server_configs = load_mcp_config(full_path).await?;
-            for server in mcp_server_configs {
+
+            for server in load_mcp_config(full_path).await? {
                 info!("McpServerConfig: {}", server.name);
+
                 let mcp_server_config = match server.to_core_config() {
                     Ok(c) => c,
                     Err(e) => {
@@ -205,70 +203,80 @@ impl AgenticBootBuilder {
                         continue;
                     }
                 };
-                let definitions = mcp_registry
-                    .register_server(mcp_server_config.clone())
-                    .await?;
 
-                if server.enabled_tools.is_empty() {
+                let definitions = mcp_registry.register_server(mcp_server_config).await?;
+
+                let to_register = if server.enabled_tools.is_empty() {
                     // expose all
-                    let tools: Vec<String> = definitions.iter().map(|t| t.name.clone()).collect();
-                    info!("Tools: {:#?}", tools);
-
-                    mcp_registry.add_definitions(&server.name, definitions);
+                    definitions
                 } else {
                     // expose only selected
-                    let filtered: Vec<_> = definitions
+                    definitions
                         .into_iter()
-                        .filter(|d| {
-                            // match by tool name (strip server prefix)
-                            server.enabled_tools.iter().any(|t| d.name.ends_with(t))
-                        })
-                        .collect();
-                    info!(
-                        "McpServerSettings: {} filtered tools: {:?}",
-                        server.name, filtered
-                    );
-                    mcp_registry.add_definitions(&server.name, filtered);
-                }
+                        .filter(|d| server.enabled_tools.iter().any(|t| d.name.ends_with(t)))
+                        .collect()
+                };
+
+                let tool_names: Vec<String> = to_register.iter().map(|t| t.name.clone()).collect();
+                info!("MCP tools registered for {}: {:?}", server.name, tool_names);
+                mcp_registry.add_definitions(&server.name, to_register);
             }
+
             info!("MCPServers configured");
+            let defs: Vec<String> = mcp_registry.definitions.keys().cloned().collect();
+            info!("Mcp Definitions: {:?}", defs);
         }
 
-        let defs: Vec<String> = mcp_registry
-            .definitions
-            .iter()
-            .map(|d| d.0.clone())
-            .collect();
-        info!("Mcp Definitions: {:?}", defs);
-
+        // ── Agent Registry ────────────────────────────────────────────────────────
         let mut agent_registry = AgentRegistry::new();
-        if let Some(path) = agents_config_path {
+        if let Some(path) = &self.agents_config_path {
             let full_path = format!("{}/{}", config_dir, path);
             info!("AgentConfig path: {}", full_path);
-            let agents = load_agents_config(config_dir.clone(), full_path).await?;
-            for agent in agents {
-                // validate — only borrows agent
-                info!("  agent: {} Tools: {:#?}", agent.id, agent.tools);
-                let missing_tool = agent.tools.iter().find(|tool_id| {
-                    tool_registry.get_tool(tool_id).is_none()
-                        && mcp_registry.get_tool(tool_id).is_none()
-                });
 
-                match missing_tool {
-                    Some(tool_id) => {
-                        error!(
-                            "Agent '{}' references unknown tool '{}' — skipping",
-                            agent.id, tool_id
-                        );
-                    }
-                    None => {
-                        info!("Registered agent: {}", agent.id);
-                        agent_registry.register_agent(agent); // ← moved here, no borrow conflict
-                    }
-                }
+            let mut agents = load_agents_config(config_dir.clone(), full_path).await?;
+
+            agents.sort_by_key(|a| match a.execution {
+                ExecutionType::Pipeline => 1,
+                ExecutionType::SingleAgent => 0,
+                ExecutionType::PipelineAgent => 0,
+            });
+
+            for agent_config in agents {
+                self.register_agent(
+                    &mut agent_registry,
+                    agent_config,
+                    &tool_registry,
+                    &mcp_registry,
+                );
             }
         }
 
+        // ── Validate Pipeline Agents ──────────────────────────────────────────────
+        let pipeline_ids: Vec<String> = agent_registry
+            .all()
+            .iter()
+            .filter(|a| a.execution == ExecutionType::Pipeline)
+            .map(|a| a.id.clone())
+            .collect();
+
+        for pipeline_id in &pipeline_ids {
+            let available = agent_registry
+                .find(pipeline_id)
+                .and_then(|a| a.pipeline.as_ref())
+                .map(|p| p.available_agents.clone())
+                .unwrap_or_default();
+
+            for sub_agent in &available {
+                if agent_registry.find(&sub_agent.id).is_none() {
+                    error!(
+                        "Pipeline '{}' references unknown agent '{}' — skipping pipeline",
+                        pipeline_id, sub_agent.id
+                    );
+                    agent_registry.agents.retain(|a| a.id != *pipeline_id);
+                    break;
+                }
+            }
+        }
         //firebase keys
         let keys = fetch_firebase_keys().await?;
         let firebase_keys = Arc::new(RwLock::new(FirebaseKeyCache {
@@ -307,6 +315,34 @@ impl AgenticBootBuilder {
             firebase_keys,
             firebase_project_id,
         })
+    }
+
+    pub fn register_agent(
+        &self,
+        agent_registry: &mut AgentRegistry,
+        agent_config: AgentConfig,
+        tool_registry: &ToolRegistry,
+        mcp_registry: &MCPRegistry,
+    ) {
+        info!(
+            "Agent: {} Tools: {:#?}",
+            agent_config.id, agent_config.tools
+        );
+
+        let missing = agent_config.tools.iter().find(|tool_id| {
+            tool_registry.get_tool(tool_id).is_none() && mcp_registry.get_tool(tool_id).is_none()
+        });
+
+        match missing {
+            Some(tool_id) => error!(
+                "Agent '{}' references unknown tool '{}' — skipping",
+                agent_config.id, tool_id
+            ),
+            None => {
+                info!("   Registered agent: {}", agent_config.id);
+                agent_registry.register_agent(agent_config);
+            }
+        }
     }
 
     pub async fn serve<F, S, P, R>(

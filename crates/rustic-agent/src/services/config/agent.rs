@@ -63,11 +63,25 @@ pub struct PipelineConfig {
     #[serde(rename = "type")]
     pub pipeline_type: String,
     /// Sub-agent IDs this pipeline can delegate to.
-    pub available_agents: Option<Vec<String>>,
+    pub available_agents: Vec<AvailableAgent>,
     /// Ordered stage names for sequential pipelines.
-    pub stages: Option<Vec<String>>,
+    pub stages: Vec<String>,
     /// Optional agent to invoke for follow-up turns after the pipeline completes.
     pub followup_agent: Option<String>,
     /// Blackboard keys that should survive across pipeline stages.
     pub persisted_blackboard_keys: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AvailableAgent {
+    pub id: String,
+    pub context: AgentContext,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AgentContext {
+    Goal,  // original user messages
+    Last,  // last stage output
+    All,   // full accumulated context
 }

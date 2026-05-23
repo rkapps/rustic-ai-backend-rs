@@ -1,15 +1,18 @@
 use anyhow::Result;
-use rustic_tools::OrchestratorStageDecision;
-use std::{collections::HashMap, sync::Arc};
-use tracing::{debug, trace};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
+use tracing::{debug, info, trace};
 
 use tokio::sync::RwLock;
 
 use crate::{
-    agents::{Agent, Orchestrator},
+    agents::{Agent, PipeLineRunner, pipeline_runner::AgentHandle},
     client::{llm::LlmClient, preset::Preset, provider::Provider},
     services::{
         builder::AgentBuilder,
+        config::agent::{AgentConfig, ExecutionType},
         registry::{agent::AgentRegistry, provider::ProviderRegistry},
     },
     tools::{mcp::MCPRegistry, tool::ToolRegistry},
@@ -102,10 +105,7 @@ impl AgentService {
         llm: &str,
         model: &str,
     ) -> Result<Agent> {
-        let agent_config = self
-            .agent_registry
-            .find(agent_id)
-            .ok_or_else(|| anyhow::anyhow!("Agent '{}' not found", agent_id))?;
+        let agent_config = self.find_agent_config(agent_id).await?;
 
         debug!("Agent Config: {}", agent_config.id);
         let provider = self.resolve_provider(llm, Some(model))?;
@@ -158,44 +158,77 @@ impl AgentService {
         Ok(agent)
     }
 
-
-    pub async fn build_orchestrator(
+    pub async fn build_pipeline_runner(
         &self,
         agent_id: &str,
         llm: &str,
         model: &str,
-    ) -> Result<Orchestrator> {
-        let agent_config = self
-            .agent_registry
-            .find(agent_id)
-            .ok_or_else(|| anyhow::anyhow!("Agent '{}' not found", agent_id))?;
+        visited: &mut HashSet<String>,
+    ) -> Result<PipeLineRunner> {
+        debug!("build_pipeline_runner - Agent: {}", agent_id);
+        let agent_config = self.find_agent_config(agent_id).await?;
+        // let agent_handle = self.build_agent_handle(agent_id, llm, model, visited).await?;
+        // let agent_handle = visited.get(&agent_config.id).unwrap();
+        // orchestrator is always a Single agent — breaks the recursion
+        let orchestrator_agent = self.build_agent_for_id(agent_id, llm, model).await?;
+        let orchestrator = AgentHandle::Single(orchestrator_agent);
 
-        debug!("Agent Config: {}", agent_config.id);
-        let provider = self.resolve_provider(llm, Some(model))?;
-        let preset = match &provider {
-            Provider::Local { .. } => Preset::Local,
-            _ => Preset::Balanced,
+        let mut agent_handles = HashMap::new();
+        if let Some(pipeline_config) = agent_config.clone().pipeline {
+            for sub_agent in pipeline_config.available_agents {
+                info!("Sub agent: {:?}", sub_agent);
+                let sub_agent_handle = self
+                    .build_agent_handle(&sub_agent.id, llm, model, visited)
+                    .await?;
+                agent_handles.insert(sub_agent.id, sub_agent_handle);
+            }
         };
 
-        let tool = OrchestratorStageDecision{};
-        let mut tool_registry = ToolRegistry::new();
-        tool_registry.register_tool(tool);
-
-        let agent = self
-            .builder()
-            .with_system_prompt(agent_config.system_prompt.clone())
-            .with_tools(tool_registry.get_tools())
-            .with_preset(preset)
-            .with_provider(provider)
-            .await?
-            .build()
-            .await?;
-        let orchestrator = Orchestrator::new(agent);
-        Ok(orchestrator)
+        Ok(PipeLineRunner::new(
+            orchestrator,
+            agent_config,
+            agent_handles,
+        ))
     }
 
+    pub async fn build_agent_handle(
+        &self,
+        agent_id: &str,
+        llm: &str,
+        model: &str,
+        visited: &mut HashSet<String>,
+    ) -> Result<AgentHandle> {
+        let config = self.find_agent_config(agent_id).await?;
+        debug!(
+            "build_agent_handle - Agent: {} execution: {:?}",
+            config.id, config.execution
+        );
+        if !visited.insert(config.id.to_string()) {
+            return Err(anyhow::anyhow!(
+                "Circular pipeline reference detected: {}",
+                config.id
+            ));
+        }
+        match config.execution {
+            ExecutionType::SingleAgent | ExecutionType::PipelineAgent => {
+                let agent = self.build_agent_for_id(agent_id, llm, model).await?;
+                Ok(AgentHandle::Single(agent))
+            }
+            ExecutionType::Pipeline => {
+                let runner =
+                    Box::pin(self.build_pipeline_runner(agent_id, llm, model, visited)).await?;
+                Ok(AgentHandle::Pipeline(Box::new(runner)))
+            }
+        }
+    }
 
-    
+    pub async fn find_agent_config(&self, agent_id: &str) -> Result<AgentConfig> {
+        self.agent_registry
+            .find(agent_id)
+            .ok_or_else(|| anyhow::anyhow!("Agent '{}' not found", agent_id))
+            .cloned()
+    }
+
     /// Resolve a [`Provider`] enum variant from a provider ID and optional model override.
     ///
     /// Falls back to the provider's `default_model` when `model` is `None`.

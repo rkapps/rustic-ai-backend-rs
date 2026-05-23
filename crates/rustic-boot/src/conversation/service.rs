@@ -2,16 +2,15 @@ use anyhow::Result;
 use chrono::Utc;
 use rustic_agent::{
     CompletionResponse,
-    agents::{Agent, agent},
     client::{
         llm::CompletionStreamResponse,
         message::Message,
-        response::{CompletionResponseContent, CompletionResponseTokenUsage},
+        response::CompletionResponseTokenUsage,
     },
-    services::{agent::AgentService, config::agent::ExecutionType},
+    services::agent::AgentService,
 };
-use std::sync::Arc;
 use tracing::debug;
+use std::{collections::HashSet, sync::Arc};
 
 use crate::{
     conversation::{
@@ -183,17 +182,19 @@ impl ConversationService {
         let cresponse = self.run_conversation(&conversation, &messages).await?;
         // let cresponse = agent.complete(&messages).await?;
 
-        let mut rcontent = String::new();
+        // let mut rcontent = String::new();
         let response = cresponse.clone();
         let usage = cresponse.usage;
         let response_id = response.response_id.clone();
-        for content in response.contents {
-            if let CompletionResponseContent::Text(val) = content {
-                // println!("The text is: {}", val);
-                rcontent = val.to_string();
-                // chat.update_assistant_message(val.to_string(), response.response_id.clone());
-            }
-        }
+
+        let rcontent = response.text_or_default();
+        // for content in response.contents {
+        //     if let CompletionResponseContent::Text(val) = content {
+        //         // println!("The text is: {}", val);
+        //         rcontent = val.to_string();
+        //         // chat.update_assistant_message(val.to_string(), response.response_id.clone());
+        //     }
+        // }
 
         // save turn
         self.save_turn(
@@ -252,6 +253,9 @@ impl ConversationService {
         conversation: &Conversation,
         messages: &[Message],
     ) -> Result<CompletionResponse> {
+
+        debug!("Run Conversation: {:?}", conversation.id);
+        // build based on the conversatoin type
         match conversation.conversation_type {
             ConversationType::Chat => {
                 let agent = self
@@ -266,44 +270,26 @@ impl ConversationService {
                 Ok(response)
             }
             ConversationType::Agent => {
-                let agent_id = conversation
-                    .agent_id
-                    .as_deref()
-                    .ok_or_else(|| anyhow::anyhow!("Agent conversation missing agent_id"))?;
+                if let Some(agent_id) = &conversation.agent_id {
 
-                let agent_config = self
-                    .agent_service
-                    .agent_registry
-                    .find(agent_id)
-                    .ok_or_else(|| anyhow::anyhow!("Agent '{}' not found", agent_id))?;
-
-                match agent_config.execution {
-                    ExecutionType::SingleAgent => {
-                        let agent = self
-                            .agent_service
-                            .build_agent_for_id(agent_id, &conversation.llm, &conversation.model)
-                            .await?;
-                        let response = agent.complete_with_tools(messages).await?;
-                        Ok(response)
-                    }
-                    ExecutionType::Pipeline => {
-                        let agent = self
-                            .agent_service
-                            .build_orchestrator(agent_id, &conversation.llm, &conversation.model)
-                            .await?;
-                        let response = agent.execute(messages).await?;
-                        Ok(response)
-                    }
-                    ExecutionType::PipelineAgent => {
-                        Err(anyhow::anyhow!("Pipeline agent cannot be executed"))
-                    }
+                    // let config = self.agent_service.find_agent_config(agent_id).await?;
+                    let mut visited = HashSet::new();
+                    let handle = self
+                        .agent_service
+                        .build_agent_handle(
+                            &agent_id,
+                            &conversation.llm,
+                            &conversation.model,
+                            &mut visited,
+                        )
+                        .await?;
+                    let response = handle
+                        .execute(messages)
+                        .await?;
+                    Ok(response)
+                } else {
+                    return Err(anyhow::anyhow!("Conversation agent_id is blank."));
                 }
-                // let agent = self
-                //     .agent_service
-                //     .build_agent_for_id(agent_id, &conversation.llm, &conversation.model)
-                //     .await?;
-                // let response = agent.complete_with_tools(messages).await?;
-                // Ok(response)
             }
         }
     }
@@ -313,6 +299,7 @@ impl ConversationService {
         conversation: &Conversation,
         messages: &[Message],
     ) -> Result<CompletionStreamResponse> {
+        // run agents based on conversation type
         match conversation.conversation_type {
             ConversationType::Chat => {
                 let agent = self
@@ -327,43 +314,16 @@ impl ConversationService {
                 Ok(Box::pin(stream))
             }
             ConversationType::Agent => {
-                let agent_id = conversation
-                    .agent_id
-                    .as_deref()
-                    .ok_or_else(|| anyhow::anyhow!("Agent conversation missing agent_id"))?;
-
-                let agent_config = self
-                    .agent_service
-                    .agent_registry
-                    .find(agent_id)
-                    .ok_or_else(|| anyhow::anyhow!("Agent '{}' not found", agent_id))?;
-
-                let agent = self
-                    .agent_service
-                    .build_agent_for_id(agent_id, &conversation.llm, &conversation.model)
-                    .await?;
-                let stream = agent.complete_with_tools_streaming(messages).await?;
-                Ok(Box::pin(stream))
-
-                // match agent_config.execution {
-                //     ExecutionType::SingleAgent => {
-                //         let agent = self
-                //         .agent_service
-                //         .build_agent_for_id(agent_id, &conversation.llm, &conversation.model)
-                //         .await?;
-                //     let stream = agent.complete_with_tools_streaming(messages).await?;
-                //     Ok(Box::pin(stream))
-
-                //     }
-                //     ExecutionType::Pipeline => {
-                //         let agent = self
-                //         .agent_service
-                //         .build_orchestrator(agent_id, &conversation.llm, &conversation.model)
-                //         .await?;
-                //     let stream = agent.complete_with_tools_streaming(messages).await?;
-                //     Ok(Box::pin(stream))
-                //     }
-                // }
+                if let Some(agent_id) = &conversation.agent_id {
+                    let agent = self
+                        .agent_service
+                        .build_agent_for_id(&agent_id, &conversation.llm, &conversation.model)
+                        .await?;
+                    let stream = agent.complete_with_tools_streaming(messages).await?;
+                    Ok(Box::pin(stream))
+                } else {
+                    return Err(anyhow::anyhow!("Conversation agent_id is blank."));
+                }
             }
         }
     }

@@ -27,6 +27,26 @@ pub enum CompletionResponseContent {
     ToolCall(ToolCallRequest),
 }
 
+
+impl CompletionResponse {
+    pub fn text(&self) -> Option<&str> {
+        self.contents.iter().find_map(|c| match c {
+            CompletionResponseContent::Text(val) => Some(val.as_str()),
+            _ => None,
+        })
+    }
+
+    pub fn text_or_default(&self) -> String {
+        let content = self.contents.iter().find_map(|c| match c {
+            CompletionResponseContent::Text(val) => Some(val.as_str()),
+            _ => None,
+        });
+        content.unwrap_or_default().to_string()
+    }
+
+}
+
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CompletionResponseTokenUsage {
     /// Total "Fresh" or "Standard" input tokens sent.

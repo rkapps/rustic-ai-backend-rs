@@ -6,7 +6,6 @@ use fin_analyse::tools::{
     TickerSentimentTool, TickerSnapshotTool, TickerTaxonomyTool,
 };
 use fin_storage::mongo::{MongoStorageManager, MongoStorageService};
-use rustic_agent::client::tools::Tool;
 use rustic_ai_api::state::AppState;
 use rustic_boot::{
     boot,
@@ -15,7 +14,7 @@ use rustic_boot::{
         templates::template_routes,
     },
 };
-use rustic_core::logger::set_logger;
+use rustic_core::{Tool, logger::set_logger};
 use rustic_ml::embeddings::openai::OpenAIEmbeddingClient;
 use rustic_providers::{BeaClient, CensusClient, FredClient};
 use rustic_tools::{BeaTool, CensusTool, FredTool};

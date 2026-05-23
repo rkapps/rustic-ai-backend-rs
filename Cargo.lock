@@ -1047,11 +1047,12 @@ checksum = "9f1f227452a390804cdb637b74a86990f2a7d7ba4b7d5693aac9b4dd6defd8d6"
 [[package]]
 name = "fin-analyse"
 version = "0.1.0"
+source = "git+https://github.com/rkapps/fin-tracker-backend-rs#ae718d1fad6bda04a96356bbf43d210f1994cc22"
 dependencies = [
  "anyhow",
  "async-trait",
- "fin-domain 0.1.0",
- "fin-storage 0.1.0",
+ "fin-domain",
+ "fin-storage",
  "futures",
  "rustic-core",
  "rustic-ml",
@@ -1065,29 +1066,12 @@ dependencies = [
 [[package]]
 name = "fin-domain"
 version = "0.1.0"
+source = "git+https://github.com/rkapps/fin-tracker-backend-rs#ae718d1fad6bda04a96356bbf43d210f1994cc22"
 dependencies = [
  "anyhow",
  "bson 3.1.0",
  "chrono",
- "fin-providers 0.1.0",
- "mongodb",
- "rust_decimal",
- "rust_decimal_macros",
- "rustic-storage",
- "serde",
- "serde_with",
- "tracing",
-]
-
-[[package]]
-name = "fin-domain"
-version = "0.1.0"
-source = "git+https://github.com/rkapps/fin-tracker-backend-rs#6e11d7f119c85212e42fd02aa1fb1a995e9abe79"
-dependencies = [
- "anyhow",
- "bson 3.1.0",
- "chrono",
- "fin-providers 0.1.0 (git+https://github.com/rkapps/fin-tracker-backend-rs)",
+ "fin-providers",
  "mongodb",
  "rust_decimal",
  "rust_decimal_macros",
@@ -1100,21 +1084,7 @@ dependencies = [
 [[package]]
 name = "fin-providers"
 version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "reqwest 0.12.28",
- "rust_decimal",
- "serde",
- "serde_json",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "fin-providers"
-version = "0.1.0"
-source = "git+https://github.com/rkapps/fin-tracker-backend-rs#6e11d7f119c85212e42fd02aa1fb1a995e9abe79"
+source = "git+https://github.com/rkapps/fin-tracker-backend-rs#ae718d1fad6bda04a96356bbf43d210f1994cc22"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1129,29 +1099,12 @@ dependencies = [
 [[package]]
 name = "fin-storage"
 version = "0.1.0"
+source = "git+https://github.com/rkapps/fin-tracker-backend-rs#ae718d1fad6bda04a96356bbf43d210f1994cc22"
 dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "fin-domain 0.1.0",
- "rust_decimal",
- "rust_decimal_macros",
- "rustic-storage",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "fin-storage"
-version = "0.1.0"
-source = "git+https://github.com/rkapps/fin-tracker-backend-rs#6e11d7f119c85212e42fd02aa1fb1a995e9abe79"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "fin-domain 0.1.0 (git+https://github.com/rkapps/fin-tracker-backend-rs)",
+ "fin-domain",
  "rust_decimal",
  "rust_decimal_macros",
  "rustic-storage",
@@ -3450,7 +3403,7 @@ dependencies = [
  "anyhow",
  "axum",
  "fin-analyse",
- "fin-storage 0.1.0 (git+https://github.com/rkapps/fin-tracker-backend-rs)",
+ "fin-storage",
  "futures",
  "jsonwebtoken",
  "reqwest 0.12.28",
