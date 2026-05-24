@@ -6,6 +6,7 @@ use std::{
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Serialize, de::DeserializeOwned};
+use serde_json::Value;
 
 use crate::core::search::SearchCriteria;
 
@@ -48,6 +49,14 @@ pub trait RepoModel<K>:
 /// may need to mutate internal state (e.g. offset maps, connection handles).
 #[async_trait]
 pub trait Repository<K, M>: Send + Sync {
+    /// Run an aggregation pipeline and return the raw results as JSON values.
+    ///
+    /// Each element of `pipeline` is a pipeline stage document (e.g.
+    /// `{"$match": ...}`, `{"$group": ...}`).  The MongoDB backend forwards
+    /// the pipeline directly to the driver; the file backend ignores the
+    /// pipeline and always returns an empty `Vec`.
+    async fn aggregate(&mut self, pipeline: Vec<Value>) -> Result<Vec<Value>>;
+
     /// Upsert multiple models in a single batch operation.
     async fn bulk_update(&mut self, models: Vec<M>) -> Result<()>;
     /// Append a tombstone record (file) or issue a delete query (MongoDB).

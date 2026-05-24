@@ -1,13 +1,16 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use bson::Document;
 use bson::serialize_to_bson;
 use bson::serialize_to_document;
 use futures::StreamExt;
+use futures::TryStreamExt;
 use mongodb::{
     bson::doc,
     options::{ReplaceOneModel, WriteModel},
 };
 use rustic_ml::search::similarity::search;
+use serde_json::Value;
 
 use std::marker::PhantomData;
 use tracing::{error, trace};
@@ -59,6 +62,32 @@ where
     K: RepoKey,
     M: RepoModel<K>,
 {
+    /// Execute a MongoDB aggregation pipeline and return results as JSON values.
+    ///
+    /// Each `Value` in `pipeline` is converted to a BSON `Document` before
+    /// being forwarded to the driver.  Results are deserialized back to
+    /// `serde_json::Value` so callers are not bound to the model type `M`.
+    async fn aggregate(&mut self, pipeline: Vec<Value>) -> Result<Vec<Value>> {
+        let bson_pipeline: Vec<Document> = pipeline
+            .iter()
+            .map(|v| {
+                bson::serialize_to_document(v)
+                    .map_err(|e| anyhow::anyhow!("BSON conversion error: {}", e))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let mut cursor = self.collection.aggregate(bson_pipeline).await?;
+        let mut results = Vec::new();
+
+        while let Some(doc) = cursor.try_next().await? {
+            let value = serde_json::to_value(&doc)
+                .map_err(|e| anyhow::anyhow!("JSON conversion error: {}", e))?;
+            results.push(value);
+        }
+
+        Ok(results)
+    }
+
     async fn bulk_update(&mut self, models: Vec<M>) -> Result<()> {
         let ns = self.collection.namespace();
 

@@ -1,6 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use rustic_ml::search::similarity::search;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{Seek, SeekFrom};
@@ -112,6 +113,10 @@ where
     K: RepoKey,
     M: RepoModel<K> + Searchable,
 {
+    /// Not supported by the file backend — always returns an empty `Vec`.
+    async fn aggregate(&mut self, _pipeline: Vec<Value>) -> Result<Vec<Value>> {
+        Ok(Vec::new())
+    }
     async fn bulk_update(&mut self, _models: Vec<M>) -> Result<()> {
         Ok(())
     }
