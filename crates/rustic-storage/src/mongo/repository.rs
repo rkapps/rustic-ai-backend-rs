@@ -80,7 +80,7 @@ where
         let mut results = Vec::new();
 
         while let Some(doc) = cursor.try_next().await? {
-            let value = serde_json::to_value(&doc)
+            let value: serde_json::Value = bson::deserialize_from_document(doc)
                 .map_err(|e| anyhow::anyhow!("JSON conversion error: {}", e))?;
             results.push(value);
         }
