@@ -409,7 +409,7 @@ impl Agent {
                 .into_iter()
                 .map(|call| {
                     let sem = semaphore.clone();
-                    let timeout_duration = Duration::from_secs(60);
+                    let timeout_duration = Duration::from_secs(120);
                     async move {
                         let _permit = sem.acquire().await.unwrap();
                         match tokio::time::timeout(

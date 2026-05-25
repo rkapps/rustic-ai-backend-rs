@@ -1,5 +1,6 @@
 use crate::{
-    Agent, CompletionChunkResponse, CompletionResponse, CompletionResponseContent, Message,
+    Agent, CompletionChunkResponse, CompletionResponse, CompletionResponseContent,
+    CompletionResponseTokenUsage, Message,
     agents::{
         ExecutionMode, StageDecision,
         helper::{
@@ -266,11 +267,14 @@ impl PipeLineRunner {
         let mut spawn_all_messages = all_messages.to_owned();
         let spawn_original_messages = original_messages.to_owned();
 
+        debug!("User Prompt {:#?}", messages);
+
         tokio::spawn(async move {
             let mut iteration = 0;
             const MAX_ITERATIONS: usize = 10;
+            let mut usage = CompletionResponseTokenUsage::default();
 
-            info!("PipelineRunner - run_dynamic_streaming");
+            info!("PipelineRunner - run_dynamic_streaming\n");
             loop {
                 iteration += 1;
                 if iteration > MAX_ITERATIONS {
@@ -280,6 +284,7 @@ impl PipeLineRunner {
                 }
 
                 let pipeline_messages = spawn_all_messages.clone();
+                let loop_start = std::time::Instant::now();
 
                 info!(
                     "Loop: {} messsages: {}",
@@ -311,7 +316,7 @@ impl PipeLineRunner {
                     Err(_) => {
                         let _ = tx
                             .send(Err(HttpError::CompletionRequestError(
-                                "Sstage decision build error".to_string(),
+                                "Stage decision build error".to_string(),
                             )))
                             .await;
                         break;
@@ -320,7 +325,7 @@ impl PipeLineRunner {
 
                 // after decision is made
                 let status = match decision.stop {
-                    true => "🧠 Synthesising...\n".to_string(),
+                    true => "🧠 Synthesising...".to_string(),
                     false => format!(
                         "⚡ Running: {} ({})",
                         decision.agents.join(", "),
@@ -331,9 +336,10 @@ impl PipeLineRunner {
                     ),
                 };
 
+                info!("decision: {:?} status: {:?}", decision.stop, status);
                 info!(
-                    "decision: {:?} excecution: {:#?} status: {:?}",
-                    decision.stop, decision.execution, status
+                    "    Reasonining: {:?}\n",
+                    decision.reasoning.clone().unwrap_or_default()
                 );
 
                 let _ = tx
@@ -344,13 +350,11 @@ impl PipeLineRunner {
                     )))
                     .await;
 
-                info!(
-                    "decision: {:?} excecution: {:#?} agents: {:?}",
-                    decision.stop, decision.execution, decision.agents
-                );
-
                 if decision.stop {
                     if let Some(handle) = runner.agent_handles.get(&decision.agents[0]) {
+                        let agent_id = &decision.agents[0];
+                        let start = std::time::Instant::now();
+
                         let input = match handle
                             .execute_sub_streaming(
                                 &decision.agents[0],
@@ -363,11 +367,47 @@ impl PipeLineRunner {
                             Err(_) => todo!(),
                         };
 
-                        info!("Synthesising done");
                         // pipe synthesizer stream to tx
                         let mut stream = input;
-                        while let Some(chunk) = stream.next().await {
-                            let _ = tx.send(chunk).await;
+                        let mut chunk_count = 0;
+                        while let Some(chunk_result) = stream.next().await {
+                            if chunk_count == 0 {
+                                let _ = tx.send(Ok(CompletionChunkResponse::content(
+                                    String::new(),
+                                    format!("  ✅ {:.1}s\n", start.elapsed().as_secs_f32()),
+                                    String::new(),
+                                ))).await;
+                            }                            
+                            chunk_count += 1;
+
+                            let chunk = match chunk_result {
+                                Ok(chunk) => chunk,
+                                Err(e) => {
+                                    tracing::error!("Stream chunk error: {}", e);
+                                    let _ =
+                                        tx.send(Err(HttpError::NetworkError(e.to_string()))).await;
+                                    break;
+                                }
+                            };
+
+                            // info!("Chunk: {:?}", chunk);
+                            // let _ = tx.send(Ok(chunk.clone())).await;
+                            
+                            if chunk.is_final {
+                                usage += chunk.usage.unwrap();
+                                info!("Synthesising and streaming done");
+                                let _ = tx
+                                    .send(Ok(CompletionChunkResponse::stop(
+                                        agent_id.clone(),
+                                        chunk.model,
+                                        String::new(),
+                                        Some(usage.clone()),
+                                    )))
+                                    .await;
+                            } else {
+                                let _ = tx.send(Ok(chunk)).await;
+                            }
+                            // }
                         }
                     }
                     break;
@@ -411,6 +451,10 @@ impl PipeLineRunner {
                         response_id: Some(response.response_id),
                     });
                 }
+
+                let elapsed = loop_start.elapsed();
+                let done = format!("  ✅ {:.1}s\n", elapsed.as_secs_f32());
+                info!("Loop: {}{}", iteration, done);
             }
         });
 
@@ -457,7 +501,7 @@ impl PipeLineRunner {
                         let sem = semaphore.clone();
                         let pipeline_msgs = pipeline_messages;
                         let all_msgs = all_messages.to_vec();
-                        let timeout_duration = Duration::from_secs(60);
+                        let timeout_duration = Duration::from_secs(120);
                         let agent_config = self.agent_config.clone();
 
                         async move {
