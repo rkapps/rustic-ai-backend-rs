@@ -9,7 +9,11 @@ use tokio::sync::RwLock;
 
 use crate::{
     agents::{Agent, PipeLineRunner, pipeline_runner::AgentHandle},
-    client::{llm::LlmClient, preset::Preset, provider::Provider},
+    client::{
+        llm::LlmClient,
+        preset::Preset,
+        provider::Provider,
+    },
     services::{
         builder::AgentBuilder,
         config::agent::{AgentConfig, ExecutionType},
@@ -103,18 +107,37 @@ impl AgentService {
     /// agent's system prompt and preset. Returns an error if `agent_id` is not found.
     pub async fn build_agent_for_id(
         &self,
+        parent_agent_id: Option<String>,
         agent_id: &str,
         llm: &str,
         model: &str,
+        preset: Option<Preset>,
     ) -> Result<Agent> {
         let agent_config = self.find_agent_config(agent_id).await?;
 
-        debug!("Agent Config: {}", agent_config.id);
         let provider = self.resolve_provider(llm, Some(model))?;
-        let preset = match &provider {
+
+        let mut dpreset = match &provider {
             Provider::Local { .. } => Preset::Local,
-            _ => Preset::Thorough,
+            _ => Preset::Balanced,
         };
+
+        if let Some(preset) = preset {
+            dpreset = preset;
+        } else {
+            // override from agent
+            if let Some(agent_preset) = agent_config.preset {
+                dpreset = agent_preset;
+            } else {
+                // override from parent
+                if let Some(parent_agent_id) = parent_agent_id {
+                    let parent_config = self.find_agent_config(&parent_agent_id).await?;
+                    if let Some(parent_preset) = parent_config.preset {
+                        dpreset = parent_preset;
+                    }
+                }
+            }
+        }
 
         let tool_registry = {
             let global = self.tool_registry.read().await;
@@ -142,16 +165,16 @@ impl AgentService {
             filtered
         };
 
+        info!("Agent Config: {} preset: {:?}", agent_config.id, dpreset);
         trace!("System Prompt: {}", agent_config.system_prompt);
         debug!("Tools: {}", tool_registry.get_tools().len());
-        debug!("Preset: {:?}", preset);
 
         let agent = self
             .builder(&agent_config.id)
             .with_system_prompt(agent_config.system_prompt.clone())
             .with_tools(tool_registry.get_tools())
             .with_filtered_mcp(mcp_registry)
-            .with_preset(preset)
+            .with_preset(dpreset)
             .with_provider(provider)
             .await?
             .build()
@@ -169,18 +192,26 @@ impl AgentService {
     ) -> Result<PipeLineRunner> {
         debug!("build_pipeline_runner - Agent: {}", agent_id);
         let agent_config = self.find_agent_config(agent_id).await?;
-        // let agent_handle = self.build_agent_handle(agent_id, llm, model, visited).await?;
-        // let agent_handle = visited.get(&agent_config.id).unwrap();
-        // orchestrator is always a Single agent — breaks the recursion
-        let orchestrator_agent = self.build_agent_for_id(agent_id, llm, model).await?;
+
+        // orchestrator is a single agent
+        let orchestrator_agent = self
+            .build_agent_for_id(None, agent_id, llm, model, agent_config.clone().preset)
+            .await?;
         let orchestrator = AgentHandle::Single(orchestrator_agent);
 
         let mut agent_handles = HashMap::new();
         if let Some(pipeline_config) = agent_config.clone().pipeline {
             for sub_agent in pipeline_config.available_agents {
-                info!("Sub agent: {:?}", sub_agent);
+                // info!("Sub agent: {:?}", sub_agent);
                 let sub_agent_handle = self
-                    .build_agent_handle(&sub_agent.id, llm, model, visited)
+                    .build_agent_handle(
+                        Some(agent_id.to_string()),
+                        &sub_agent.id,
+                        llm,
+                        model,
+                        sub_agent.preset,
+                        visited,
+                    )
                     .await?;
                 agent_handles.insert(sub_agent.id, sub_agent_handle);
             }
@@ -195,9 +226,11 @@ impl AgentService {
 
     pub async fn build_agent_handle(
         &self,
+        parent_agent_id: Option<String>,
         agent_id: &str,
         llm: &str,
         model: &str,
+        preset: Option<Preset>,
         visited: &mut HashSet<String>,
     ) -> Result<AgentHandle> {
         let config = self.find_agent_config(agent_id).await?;
@@ -213,7 +246,9 @@ impl AgentService {
         }
         match config.execution {
             ExecutionType::SingleAgent | ExecutionType::PipelineAgent => {
-                let agent = self.build_agent_for_id(agent_id, llm, model).await?;
+                let agent = self
+                    .build_agent_for_id(parent_agent_id, agent_id, llm, model, preset)
+                    .await?;
                 Ok(AgentHandle::Single(agent))
             }
             ExecutionType::Pipeline => {

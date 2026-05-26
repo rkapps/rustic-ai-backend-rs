@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::Preset;
+
 /// Controls how an agent participates in request handling.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -19,6 +21,7 @@ pub struct AgentConfig {
     pub id: String,
     pub name: String,
     pub description: String,
+    pub preset: Option<Preset>,
     /// When `true`, the agent appears in the public catalog and can be started directly by users.
     pub standalone: bool,
     pub execution: ExecutionType,
@@ -76,6 +79,8 @@ pub struct PipelineConfig {
 pub struct AvailableAgent {
     pub id: String,
     pub context: AgentContext,
+    #[serde(default)]
+    pub preset: Option<Preset>
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

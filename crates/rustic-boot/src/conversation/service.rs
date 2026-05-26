@@ -242,7 +242,6 @@ impl ConversationService {
         let stream = self
             .run_conversation_streaming(&conversation, &messages)
             .await?;
-        // let stream = agent.complete_with_tools_streaming(&messages).await?;
         Ok(Box::pin(stream))
     }
 
@@ -268,14 +267,15 @@ impl ConversationService {
             }
             ConversationType::Agent => {
                 if let Some(agent_id) = &conversation.agent_id {
-                    // let config = self.agent_service.find_agent_config(agent_id).await?;
                     let mut visited = HashSet::new();
                     let handle = self
                         .agent_service
                         .build_agent_handle(
+                            None,
                             &agent_id,
                             &conversation.llm,
                             &conversation.model,
+                            None,
                             &mut visited,
                         )
                         .await?;
@@ -309,24 +309,20 @@ impl ConversationService {
             }
             ConversationType::Agent => {
                 if let Some(agent_id) = &conversation.agent_id {
-                    // let config = self.agent_service.find_agent_config(agent_id).await?;
                     let mut visited = HashSet::new();
                     let handle = self
                         .agent_service
                         .build_agent_handle(
+                            None,
                             &agent_id,
                             &conversation.llm,
                             &conversation.model,
+                            None,                            
                             &mut visited,
                         )
                         .await?;
 
                     debug!("Building conversatino agent: {}", agent_id);
-                    // let agent = self
-                    //     .agent_service
-                    //     .build_agent_for_id(&agent_id, &conversation.llm, &conversation.model)
-                    //     .await?;
-                    // let stream = agent.ex_streaming(messages).await?;
                     let stream = handle.execute_streaming(messages).await?;
                     Ok(Box::pin(stream))
                 } else {
