@@ -25,16 +25,17 @@ pub fn build_merged_sub_agent_message(messages: &mut Vec<Message>) -> String {
 
 pub fn build_sub_agent_messages(messages: &mut Vec<Message>, response: &CompletionResponse) {
     if let Some(sub_response) = build_sub_agent_response(response) {
+        // parse content as JSON value first
+        let content_value: serde_json::Value = serde_json::from_str(&sub_response.content)
+            .unwrap_or(serde_json::Value::String(sub_response.content.clone()));
+
         let content = serde_json::json!({
             "agent": sub_response.agent_id,
-            "content": sub_response.content
-        })
-        .to_string();
-
-        debug!(content);
+            "content": content_value  // embedded as value not string
+        }).to_string();
 
         messages.push(Message::Assistant {
-            content: content,
+            content,
             response_id: None,
         });
     }
