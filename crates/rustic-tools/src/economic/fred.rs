@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use rustic_core::Tool;
 use rustic_providers::FredClient;
 use serde_json::{Value, json};
+use tracing::info;
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -75,6 +76,8 @@ impl Tool for FredTool {
 
         let frequency = params["frequency"].as_str();
         let limit = params["limit"].as_u64().map(|l| l as usize);
+
+        info!("Series: {:?} Frequency: {:?} data: {:?}", series_id, frequency, limit);
 
         let data = self.client.get_series(series_id, frequency, limit).await?;
 

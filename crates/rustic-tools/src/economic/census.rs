@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use rustic_core::Tool;
 use rustic_providers::CensusClient;
 use serde_json::{Value, json};
+use tracing::info;
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -88,6 +89,8 @@ impl Tool for CensusTool {
             .iter()
             .filter_map(|v| v.as_str())
             .collect();
+
+        info!("Year: {:?} Dataser {:?} Geo: {:?} Variables: {:?}", year, dataset, geo, variables);
 
         if variables.is_empty() {
             return Err(anyhow::anyhow!("at least one variable required"));
