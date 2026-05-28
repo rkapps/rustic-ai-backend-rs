@@ -3,8 +3,8 @@ use async_trait::async_trait;
 use rustic_core::Tool;
 use rustic_providers::BeaClient;
 use serde_json::{Value, json};
-use tracing::info;
 use std::sync::Arc;
+use tracing::info;
 
 #[derive(Debug)]
 pub struct BeaTool {
@@ -97,7 +97,10 @@ impl Tool for BeaTool {
         let frequency = params["frequency"].as_str().unwrap_or("A");
         let year = params["year"].as_str().unwrap_or("LAST5");
 
-        info!("Dataset: {:?} Table Name: {:?} frequency: {:?} year: {:?}", dataset, table_name, frequency, year);
+        info!(
+            "Dataset: {:?} Table Name: {:?} frequency: {:?} year: {:?}",
+            dataset, table_name, frequency, year
+        );
 
         match dataset {
             "nipa" => {
