@@ -1,3 +1,11 @@
+//! Multi-agent pipeline execution: orchestrator-driven stage loop and sub-agent dispatch.
+//!
+//! The core types here are:
+//! - [`AgentHandle`] — a polymorphic wrapper that lets a pipeline slot hold either a plain
+//!   [`Agent`] or a nested [`PipeLineRunner`], enabling recursive pipeline composition.
+//! - [`PipeLineRunner`] — drives the orchestrator → decide → run-sub-agents loop until the
+//!   orchestrator sets `stop: true`, then returns or streams the final synthesised response.
+
 use crate::{
     Agent, CompletionChunkResponse, CompletionResponse, CompletionResponseContent,
     CompletionResponseTokenUsage, Message,
@@ -17,12 +25,26 @@ use tokio_stream::StreamExt;
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::{debug, error, info, trace, warn};
 
+/// A slot in the pipeline that can be occupied by a leaf [`Agent`] or a nested [`PipeLineRunner`].
+///
+/// This indirection lets pipelines be composed recursively: a sub-agent in one pipeline can
+/// itself be a full pipeline, which the orchestrator treats as a single opaque agent.
 pub enum AgentHandle {
+    /// A single LLM-backed agent with its own tool registries.
     Single(Agent),
+    /// A nested pipeline treated as a single agent by the parent orchestrator.
     Pipeline(Arc<PipeLineRunner>),
 }
 
 impl AgentHandle {
+    /// Execute this handle as a sub-agent within a pipeline stage and return its response.
+    ///
+    /// Builds the input message slice according to the agent's configured [`AgentContext`]:
+    /// - `Goal` — passes the original user messages unchanged.
+    /// - `Last` — passes only the most recent assistant output as a new user message.
+    /// - `All`  — merges all pipeline assistant outputs into a synthesis prompt.
+    ///
+    /// For `Pipeline` handles the `goal` override, if present, replaces the input entirely.
     pub async fn execute_sub(
         &self,
         agent_config: AgentConfig,
@@ -61,6 +83,11 @@ impl AgentHandle {
         }
     }
 
+    /// Execute this handle as a streaming sub-agent, always using the `All` context strategy.
+    ///
+    /// Only `Single` handles support streaming. Calling this on a `Pipeline` handle returns
+    /// [`HttpError::CompletionRequestError`] because a pipeline runner cannot itself be an
+    /// orchestrator that streams.
     pub async fn execute_sub_streaming(
         &self,
         agent_id: &str,
@@ -77,6 +104,10 @@ impl AgentHandle {
         }
     }
 
+    /// Ask the orchestrator to produce a [`StageDecision`] JSON from the current message history.
+    ///
+    /// Only `Single` handles may act as orchestrators; a `Pipeline` handle returns an error
+    /// because nested pipelines are opaque sub-agents, not decision-makers.
     pub async fn decide(
         &self,
         agent_id: &str,
@@ -95,6 +126,10 @@ impl AgentHandle {
         }
     }
 
+    /// Execute this handle directly (not as a sub-agent) and return its response.
+    ///
+    /// `Pipeline` handles are run statelessly: only the last message from `original_messages`
+    /// is forwarded so the nested pipeline starts fresh rather than inheriting outer context.
     pub async fn execute(&self, original_messages: &[Message]) -> HttpResult<CompletionResponse> {
         match self {
             AgentHandle::Single(agent) => agent.complete(&original_messages).await,
@@ -108,6 +143,10 @@ impl AgentHandle {
         }
     }
 
+    /// Execute this handle with streaming output.
+    ///
+    /// `Pipeline` handles delegate to [`PipeLineRunner::run_dynamic_streaming`], forwarding
+    /// only the last message to keep the nested pipeline stateless.
     pub async fn execute_streaming(
         &self,
         original_messages: &[Message],
@@ -121,10 +160,19 @@ impl AgentHandle {
         }
     }
 
+    /// Return the original user messages unchanged.
+    ///
+    /// Used by sub-agents configured with [`AgentContext::Goal`] that need the raw user request
+    /// regardless of what earlier pipeline stages produced.
     pub fn build_goal_input(original_messages: &[Message]) -> Vec<Message> {
         original_messages.to_vec()
     }
 
+    /// Build an input containing only the most recent assistant output as a `User` message.
+    ///
+    /// Used by sub-agents configured with [`AgentContext::Last`] so each stage sees only the
+    /// immediately preceding result rather than the full accumulated history. Falls back to
+    /// `original_messages` if no assistant output exists yet.
     pub fn build_last_input(
         original_messages: &[Message],
         pipeline_messages: &[Message],
@@ -148,6 +196,11 @@ impl AgentHandle {
         }
     }
 
+    /// Build an input that merges all pipeline assistant outputs into a synthesis prompt.
+    ///
+    /// Used by sub-agents configured with [`AgentContext::All`] (typically the final synthesiser).
+    /// Produces a two-message slice: the original user request followed by a `User` message that
+    /// concatenates all prior assistant outputs and asks the agent to synthesise them.
     pub fn build_all_input(
         original_messages: &[Message],
         pipeline_messages: &[Message],
@@ -174,10 +227,19 @@ impl AgentHandle {
     }
 }
 
+/// Orchestrates a multi-stage pipeline by repeatedly asking an orchestrator agent to decide
+/// which sub-agents to run next, executing them, and feeding their outputs back until the
+/// orchestrator signals `stop: true`.
+///
+/// The `agent_handles` map is pre-built at construction time and may contain nested
+/// `Pipeline` entries, so the entire structure forms a recursive agent tree.
 pub struct PipeLineRunner {
+    /// The decision-making agent that produces [`StageDecision`] JSON each iteration.
     pub orchestrator: AgentHandle,
+    /// Configuration for this pipeline (id, available agents, context strategy, etc.).
     pub agent_config: AgentConfig,
-    pub agent_handles: HashMap<String, AgentHandle>, // pre-built, recursive
+    /// Pre-built handles keyed by agent id; supports recursive pipeline nesting.
+    pub agent_handles: HashMap<String, AgentHandle>,
 }
 
 impl PipeLineRunner {
@@ -193,10 +255,21 @@ impl PipeLineRunner {
         }
     }
 
+    /// Entry point — delegates to [`run_dynamic`](Self::run_dynamic).
     pub async fn run(&self, messages: &[Message]) -> HttpResult<CompletionResponse> {
         self.run_dynamic(messages).await
     }
 
+    /// Drive the orchestrator loop and return the final [`CompletionResponse`].
+    ///
+    /// Each iteration:
+    /// 1. Appends a "decide" prompt (unless the last message is already a `User`).
+    /// 2. Asks the orchestrator to emit a [`StageDecision`].
+    /// 3. Runs the chosen sub-agents via [`run_sub_agents`](Self::run_sub_agents).
+    /// 4. Appends their merged output to the conversation history.
+    /// 5. Stops and returns when `decision.stop == true`.
+    ///
+    /// Returns [`HttpError::MaxIterationsExceeded`] if the orchestrator has not stopped after 10 loops.
     pub async fn run_dynamic(&self, messages: &[Message]) -> HttpResult<CompletionResponse> {
         let mut iteration = 0;
 
@@ -295,6 +368,14 @@ impl PipeLineRunner {
         }
     }
 
+    /// Drive the orchestrator loop and stream output chunks to the caller.
+    ///
+    /// Behaviour mirrors [`run_dynamic`](Self::run_dynamic) but the final synthesiser agent
+    /// is executed with streaming enabled; intermediate status lines (e.g. "⚡ Running: …") and
+    /// per-stage elapsed-time markers are injected as content chunks so the client gets
+    /// real-time feedback while waiting for the pipeline to complete.
+    ///
+    /// Spawns a background task; returns immediately with a [`ReceiverStream`] (capacity 200).
     pub async fn run_dynamic_streaming(
         self: Arc<Self>,
         messages: &[Message],
@@ -545,6 +626,15 @@ impl PipeLineRunner {
         Ok(ReceiverStream::new(rx))
     }
 
+    /// Execute the sub-agents named in `decision` and return their merged output string.
+    ///
+    /// - `Sequential`: agents run in order; each sees the outputs of previous agents via
+    ///   `pipeline_messages` growing between calls.
+    /// - `Parallel`: agents run concurrently, bounded to 5 in-flight at once with a 120-second
+    ///   per-agent timeout. Errors are logged as warnings and the failed agent is skipped.
+    ///
+    /// The individual responses are normalised via [`build_sub_agent_messages`] and then joined
+    /// by [`build_merged_sub_agent_message`] before being returned.
     pub async fn run_sub_agents(
         &self,
         decision: &StageDecision,

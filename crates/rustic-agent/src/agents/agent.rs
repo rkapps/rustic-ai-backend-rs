@@ -34,7 +34,7 @@ use crate::{
 /// | [`complete_with_tools_streaming`](Self::complete_with_tools_streaming) | yes | yes |
 #[derive(Debug, Clone)]
 pub struct Agent {
-    // agent id
+    /// Unique identifier for this agent instance, used in log lines and response payloads.
     pub id: String,
     /// Provider label (e.g. `"Anthropic"`) used for logging and routing.
     pub llm: String,
@@ -44,11 +44,15 @@ pub struct Agent {
     pub client: Arc<dyn LlmClient>,
     /// System prompt prepended before every conversation.
     pub system_prompt: Option<String>,
+    /// Sampling temperature; higher values increase output randomness.
     pub temperature: f32,
+    /// Hard cap on tokens in each completion response.
     pub max_tokens: i32,
+    /// Whether the provider should persist the conversation for multi-turn continuations.
     pub store: bool,
     /// When `true`, the provider is asked to cache the prompt.
     pub enable_cache: bool,
+    /// Controls how much chain-of-thought reasoning the model performs before answering.
     pub reasoning_effort: ReasoningEffort,
     /// Registry of in-process tools the agent can call.
     pub tool_registry: Arc<ToolRegistry>,
@@ -165,12 +169,13 @@ impl Agent {
 
                 let mut model = String::new();
                 let mut response_id = String::new();
+                // Gemini sends partial thought tokens as random-looking characters; accumulate
+                // the full thought before appending it as a Thought message so the model receives
+                // a coherent block on the next turn.
                 let mut thought_content = String::new();
-                // let agent_id = agent_id.clone();
 
                 // 2. "Pump" the chunks through the channel as they arrive
                 while let Some(chunk_result) = llm_stream.next().await {
-                    // debug!("chunk result: {:?}", chunk_result);
                     let chunk = match chunk_result {
                         Ok(chunk) => chunk,
                         Err(e) => {
@@ -180,11 +185,9 @@ impl Agent {
                         }
                     };
                     if let Some(call) = chunk.tool_call {
-                        // debug!("Agent: {} call: {:?}", agent_id, call);
                         debug!(target: "agent-tool", agent= %agent_id, tool_call= ?call, "Tool Call");
                         tool_calls.push(call);
                     } else {
-                        // trace!("Agent: {} chunk: {:?}", agent_id, chunk);
                         debug!(target: "agent-tool", agent= %agent_id, chunk= ?chunk, "Chunk");
 
                         if chunk.is_final {
