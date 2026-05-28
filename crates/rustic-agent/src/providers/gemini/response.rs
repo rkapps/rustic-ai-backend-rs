@@ -5,7 +5,7 @@ use serde_json::Value;
 #[derive(Debug, Deserialize)]
 pub struct GeminiInteractionsResponse {
     /// Provider-assigned interaction ID (used as `previous_interaction_id` in follow-up turns).
-    pub id: String,
+    pub id: Option<String>,
     pub model: String,
     /// Ordered output items produced by the model.
     pub outputs: Vec<GeminiInteractionsResponseOutput>,

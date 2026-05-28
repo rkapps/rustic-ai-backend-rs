@@ -19,6 +19,8 @@ pub struct CompletionRequest {
     pub max_tokens: i32,
     /// When `true`, the provider is asked to cache the prompt for cheaper repeated calls.
     pub enable_cache: bool,
+    /// When `true`, the provider is stateful
+    pub store: bool,
     /// Controls how much internal chain-of-thought reasoning the model performs.
     pub reasoning_effort: ReasoningEffort,
     /// When `true`, the response is delivered as a stream of chunks rather than a single payload.

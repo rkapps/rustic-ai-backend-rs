@@ -21,6 +21,7 @@ pub struct GeminiInteractionsRequest {
     previous_interaction_id: Option<String>,
     system_instruction: String,
     stream: bool,
+    store: bool,
     generation_config: GeminiCompletionRequestConfig,
     pub tools: Vec<ToolDefinition>,
 }
@@ -117,17 +118,36 @@ impl GeminiInteractionsRequest {
                             content: std::mem::take(&mut model_contents),
                         });
                     }
-                    user_input = Some(GeminiCompletionRequestInput::Content {
-                        role: "user".to_string(),
-                        content,
-                    });
+
+                    // if state only add the last user
+                    if request.store {
+                        user_input = Some(GeminiCompletionRequestInput::Content {
+                            role: "user".to_string(),
+                            content,
+                        });
+                    } else {
+                        let user_input1 = GeminiCompletionRequestInput::Content {
+                            role: "user".to_string(),
+                            content,
+                        };
+                        inputs.push(user_input1);
+                    }
                 }
 
                 Message::Assistant {
-                    content: _,
+                    content,
                     response_id,
                 } => {
                     id = response_id;
+
+                    // only add assistant if it is a stateless
+                    if !request.store {
+                        let user_input = GeminiCompletionRequestInput::Content {
+                            role: "model".to_string(),
+                            content,
+                        };
+                        inputs.push(user_input);
+                    }
                 }
 
                 Message::ToolCall {
@@ -162,9 +182,12 @@ impl GeminiInteractionsRequest {
             }
         }
 
-        // Push user message
-        if let Some(input) = user_input {
-            inputs.push(input);
+        // for stateless push the alst input
+        if request.store {
+            // Push user message
+            if let Some(input) = user_input {
+                inputs.push(input);
+            }
         }
 
         // Push model message with thought + function calls combined
@@ -187,8 +210,9 @@ impl GeminiInteractionsRequest {
             model: MODEL_GEMINI_3_FLASH_PREVIEW.to_string(),
             input: inputs,
             system_instruction: request.system.clone().unwrap_or_default(),
-            previous_interaction_id: id,
+            previous_interaction_id: None,
             stream: request.stream,
+            store: request.store,
             generation_config: GeminiCompletionRequestConfig::new(&crequest),
             tools: request
                 .definitions

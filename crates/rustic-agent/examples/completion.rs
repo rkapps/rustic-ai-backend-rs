@@ -45,6 +45,7 @@ async fn main() -> Result<()> {
         model: gemini::MODEL_GEMINI_3_FLASH_PREVIEW.to_string(),
         reasoning_effort: ReasoningEffort::Medium,
         system_prompt,
+        store: true,
         temperature: 0.7,
         tool_registry: Arc::new(ToolRegistry::new()),
     };

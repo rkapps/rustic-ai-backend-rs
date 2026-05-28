@@ -47,6 +47,7 @@ pub struct AgentBuilder<'a> {
     max_tokens: Option<i32>,
     enable_cache: bool,
     reasoning_effort: ReasoningEffort,
+    store: bool,
     /// Tools accumulated via `with_tool*` — registered into the shared registry on `build`.
     pending_tools: Vec<Arc<dyn Tool>>,
     filtered_mcp: Option<MCPRegistry>,
@@ -66,6 +67,7 @@ impl<'a> AgentBuilder<'a> {
             max_tokens: None,
             enable_cache: false,
             reasoning_effort: ReasoningEffort::None,
+            store: true,
             pending_tools: Vec::new(),
             filtered_mcp: None,
         }
@@ -74,6 +76,11 @@ impl<'a> AgentBuilder<'a> {
     /// Set the system prompt prepended before every conversation.
     pub fn with_system_prompt(mut self, system_prompt: String) -> Self {
         self.system_prompt = Some(system_prompt);
+        self
+    }
+
+    pub fn with_store(mut self, store: bool) -> Self {
+        self.store = store;
         self
     }
 
@@ -303,6 +310,7 @@ impl<'a> AgentBuilder<'a> {
 
         let reasoning_effort = self.reasoning_effort;
         let enable_cache = self.enable_cache;
+        let store = self.store;
 
         Ok(Agent {
             id: self.id,
@@ -313,6 +321,7 @@ impl<'a> AgentBuilder<'a> {
             temperature,
             max_tokens,
             reasoning_effort,
+            store,
             enable_cache,
             tool_registry,
             mcp_registry,

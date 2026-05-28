@@ -7,7 +7,7 @@ use rustic_core::{
     error::HttpError,
     http::{HttpClient, HttpResult},
 };
-use tracing::{debug, error};
+use tracing::{debug, error, trace};
 
 use crate::{
     client::{
@@ -71,7 +71,7 @@ impl GeminiClient {
         let grequest = GeminiInteractionsRequest::new(request)
             .map_err(|e| HttpError::CompletionRequestError(e.to_string()))?;
 
-        debug!("GeminiCompletionRequest: {:#?}", grequest);
+        debug!(target: "agent-gemini", "Gemini complete_interactions: {:#?}", grequest);
 
         let body = serde_json::json!(grequest);
         let gresponse = self
@@ -79,7 +79,7 @@ impl GeminiClient {
             .post_request::<GeminiInteractionsResponse>(url, Some(headers), body)
             .await?;
 
-        debug!("GeminiCompletionResponse: {:#?}", gresponse);
+        debug!(target: "agent-gemini", "GeminiCompletionResponse: {:#?}", gresponse);
 
         let id = gresponse.id;
         let mut rcontents: Vec<CompletionResponseContent> = Vec::new();
@@ -128,7 +128,7 @@ impl GeminiClient {
         let cresponse = CompletionResponse {
             id: agent_id.clone(),
             model: gresponse.model,
-            response_id: id,
+            response_id: id.unwrap_or_default(),
             contents: rcontents,
             usage,
         };
@@ -150,7 +150,7 @@ impl LlmClient for GeminiClient {
         let url = format!("{}/v1beta/interactions", self.base_url,);
 
         let agent_id = request.id.clone();
-        debug!("Gemini Request: {:#?}", request);
+        debug!(target: "agent-gemini", request= ?request, "Gemini Completion");
 
         let mut headers = reqwest::header::HeaderMap::new();
 
@@ -164,7 +164,7 @@ impl LlmClient for GeminiClient {
             .map_err(|e| HttpError::CompletionRequestError(e.to_string()))?;
 
         let body = serde_json::json!(grequest);
-        debug!("Body: {:#?}", body);
+        trace!(target: "agent-gemini", body= ?body, "Gemini Completion body");
         let response = self
             .http_client
             .post_stream_request(url, Some(headers), body)
@@ -213,7 +213,9 @@ impl LlmClient for GeminiClient {
                             if let Some(text) = delta.text {
                                 yield Ok(CompletionChunkResponse::content(agent_id.clone(), text, String::new()))
                             } else if let Some(signature) = delta.signature {
-                                debug!("chunk: {:#?}", signature);
+                                // debug!("chunk: {:#?}", signature);
+                                debug!(target: "agent-gemini", signature= ?signature, "Chunk Signature");
+
                                 yield Ok(CompletionChunkResponse::thought(agent_id.clone(), signature))
                             } else if dtype == "function_call" {
                                 yield Ok(CompletionChunkResponse::tool_call(
@@ -244,9 +246,7 @@ impl LlmClient for GeminiClient {
                                  + cusage.total_thought_tokens,                                       // reasoning
                          };
 
-                       debug!("Response stats - model: {:#?} response_id: {} usage: {:#?}",
-                             interaction.model, interaction.id, usage
-                         );
+                    debug!(target: "agent-gemini", model= ?interaction.model, response_id= ?interaction.id, usage= ?usage, "Response stats");
 
                     yield Ok(CompletionChunkResponse::stop(
                             agent_id.clone(),

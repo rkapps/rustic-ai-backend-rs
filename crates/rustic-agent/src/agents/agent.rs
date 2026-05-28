@@ -46,6 +46,7 @@ pub struct Agent {
     pub system_prompt: Option<String>,
     pub temperature: f32,
     pub max_tokens: i32,
+    pub store: bool,
     /// When `true`, the provider is asked to cache the prompt.
     pub enable_cache: bool,
     pub reasoning_effort: ReasoningEffort,
@@ -148,6 +149,7 @@ impl Agent {
                     reasoning_effort: agent.reasoning_effort.clone(),
                     enable_cache: agent.enable_cache,
                     stream: true,
+                    store: agent.store,
                     definitions: new_definitions.clone(),
                 };
 
@@ -339,6 +341,7 @@ impl Agent {
             temperature: self.temperature,
             max_tokens: self.max_tokens,
             stream: false,
+            store: self.store,
             reasoning_effort: self.reasoning_effort.clone(),
             enable_cache: self.enable_cache,
             definitions,
