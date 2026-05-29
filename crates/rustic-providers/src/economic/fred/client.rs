@@ -1,6 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use rustic_core::HttpClient;
+use tracing::info;
 use std::sync::Arc;
 
 use super::model::{FredObservationsResponse, FredSeriesResponse};
@@ -55,6 +56,7 @@ impl FredClient {
             "{}/series/observations?series_id={}&api_key={}&frequency={}&sort_order=desc&limit={}&file_type=json",
             FRED_BASE_URL, series_id, self.api_key, frequency, limit
         );
+        info!("Observations Url: {}", url);
 
         let raw: FredObservationsResponse = self.http_client.get_request(url, None).await?;
 
@@ -86,6 +88,7 @@ impl FredClient {
             "{}/series?series_id={}&api_key={}&file_type=json",
             FRED_BASE_URL, series_id, self.api_key
         );
+        info!("Series Info Url: {}", url);
 
         let raw: FredSeriesResponse = self.http_client.get_request(url, None).await?;
 

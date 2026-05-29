@@ -1,6 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use rustic_core::HttpClient;
+use tracing::info;
 use std::sync::Arc;
 
 use super::model::{CensusRawResponse, CensusRecord};
@@ -46,6 +47,7 @@ impl CensusClient {
             "{}/{}/acs/{}?get={}&for={}&key={}",
             CENSUS_BASE_URL, year, dataset, vars, geo, self.api_key
         );
+        info!("ACS Url: {}", url);
 
         let raw: CensusRawResponse = self.http_client.get_request(url, None).await?;
 
@@ -64,6 +66,7 @@ impl CensusClient {
             "{}/timeseries/poverty/saipe?get={}&for={}&time={}&key={}",
             CENSUS_BASE_URL, vars, geo, year, self.api_key
         );
+        info!("CPS Url: {}", url);
 
         let raw: CensusRawResponse = self.http_client.get_request(url, None).await?;
 
@@ -77,6 +80,7 @@ impl CensusClient {
             "{}/timeseries/intltrade/imports?get={}&time={}&key={}",
             CENSUS_BASE_URL, vars, year, self.api_key
         );
+        info!("Trade Url: {}", url);
 
         let raw: CensusRawResponse = self.http_client.get_request(url, None).await?;
 

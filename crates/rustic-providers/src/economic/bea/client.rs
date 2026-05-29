@@ -1,6 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use rustic_core::HttpClient;
+use tracing::info;
 use std::sync::Arc;
 
 use super::model::{BeaDataRow, BeaResponse};
@@ -39,6 +40,7 @@ impl BeaClient {
             "{}?UserID={}&method=GetData&datasetname=NIPA&TableName={}&Frequency={}&Year={}&ResultFormat=JSON",
             BEA_BASE_URL, self.api_key, table_name, frequency, year
         );
+        info!("Nipa Url: {}", url);
 
         let response: BeaResponse = self.http_client.get_request(url, None).await?;
 
@@ -77,7 +79,7 @@ impl BeaClient {
             "{}?UserID={}&method=GetData&datasetname=Regional&TableName={}&LineCode={}&GeoFips={}&Year={}&ResultFormat=JSON",
             BEA_BASE_URL, self.api_key, table_name, line_code, geo_fips, year
         );
-
+        info!("Regional Url: {}", url);
         let response: BeaResponse = self.http_client.get_request(url, None).await?;
 
         if let Some(error) = response.bea_api.error {
@@ -181,6 +183,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_bea_regional_raw() {
+
+        set_logger("rustic_providers=debug,rustic_core=trace".to_string());
+
         let api_key = std::env::var("BEA_API_KEY").unwrap();
         let client = HttpClient::new().unwrap();
 
@@ -210,6 +215,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_bea_state_income() {
+
+        set_logger("rustic_providers=debug,rustic_core=trace".to_string());
         let api_key = std::env::var("BEA_API_KEY").unwrap();
         let client = BeaClient::new(api_key).unwrap();
 
@@ -224,8 +231,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_bea_get_series() {
-        let api_key = std::env::var("BEA_API_KEY").expect("BEA_API_KEY not set");
 
+        set_logger("rustic_providers=debug,rustic_core=trace".to_string());
+
+        let api_key = std::env::var("BEA_API_KEY").expect("BEA_API_KEY not set");
         let client = BeaClient::new(api_key).unwrap();
 
         // T20100:A065RC = Personal Income from T20100
