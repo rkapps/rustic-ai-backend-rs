@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use reqwest::header::{HeaderMap, HeaderValue};
-use rustic_core::http::HttpClient;
+use rustic_core::HttpClient;
 use serde_json::{Value, json};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;

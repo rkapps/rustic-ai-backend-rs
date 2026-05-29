@@ -8,7 +8,7 @@ use crate::{
 };
 use anyhow::Result;
 use async_trait::async_trait;
-use rustic_core::http::HttpResult;
+use rustic_core::HttpResult;
 
 /// [`LlmClient`] implementation that proxies to a locally-hosted model server.
 ///

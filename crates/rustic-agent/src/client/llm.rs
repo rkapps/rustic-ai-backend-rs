@@ -2,7 +2,7 @@ use std::pin::Pin;
 
 use async_trait::async_trait;
 use futures_util::Stream;
-use rustic_core::http::HttpResult;
+use rustic_core::HttpResult;
 use serde::Serialize;
 
 use crate::client::{

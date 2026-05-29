@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use rustic_core::{error::HttpError, http::HttpResult};
+use rustic_core::{HttpError, HttpResult};
 use tokio::{
     sync::{Semaphore, mpsc},
     time::sleep,
