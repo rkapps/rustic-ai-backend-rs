@@ -1,0 +1,94 @@
+{
+    "observation_date": "2026-04",
+    "consumer_health": {
+        "unemployment_rate": {
+            "2026-04": "4.3%",
+            "2026-03": "4.3%",
+            "2026-02": "4.4%"
+        },
+        "consumer_sentiment": {
+            "2026-04": 49.8,
+            "2026-03": 53.3,
+            "2026-02": 56.6
+        },
+        "real_disposable_personal_income": {
+            "2026-04": 17932.6,
+            "2026-03": 18019.6,
+            "2026-02": 18048.5
+        },
+        "cpi_all_items": {
+            "2026-04": 332.407,
+            "2026-03": 330.293,
+            "2026-02": 327.46
+        }
+    },
+    "consumer_spending": {
+        "retail_sales_ex_motor_vehicles": {
+            "2026-04": 617856,
+            "2026-03": 613556,
+            "2026-02": 602258
+        },
+        "total_pce": {
+            "2026-04": 21979.4,
+            "2026-03": 21868.3,
+            "2026-02": 21655.8
+        }
+    },
+    "housing": {
+        "housing_starts": {
+            "2026-04": 1465,
+            "2026-03": 1507,
+            "2026-02": 1346
+        },
+        "building_permits": {
+            "2026-04": 1423,
+            "2026-03": 1363,
+            "2026-02": 1540
+        }
+    },
+    "state_demographics_2023": {
+        "California": {
+            "median_household_income": 95521,
+            "median_home_value": 725800,
+            "population": 38965193,
+            "median_age": 38.2,
+            "owner_occupied_units": 7658458,
+            "below_poverty_level": 4588687,
+            "unemployed_count": 1110856
+        },
+        "Texas": {
+            "median_household_income": 75780,
+            "median_home_value": 296900,
+            "population": 30503301,
+            "median_age": 35.9,
+            "owner_occupied_units": 7048369,
+            "below_poverty_level": 4086851,
+            "unemployed_count": 686054
+        },
+        "Florida": {
+            "median_household_income": 73311,
+            "median_home_value": 381000,
+            "population": 22610726,
+            "median_age": 42.8,
+            "owner_occupied_units": 6103429,
+            "below_poverty_level": 2729519,
+            "unemployed_count": 459949
+        },
+        "New_York": {
+            "median_household_income": 82095,
+            "median_home_value": 420200,
+            "population": 19571216,
+            "median_age": 40.2,
+            "owner_occupied_units": 4221669,
+            "below_poverty_level": 2702955,
+            "unemployed_count": 506633
+        }
+    },
+    "national_income_trend": {
+        "2024": 24897613000000,
+        "2023": 23577208000000,
+        "2022": 22144814000000,
+        "2021": 21484168000000,
+        "2020": 19613059000000
+    }
+}

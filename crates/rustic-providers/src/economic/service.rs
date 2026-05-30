@@ -24,16 +24,16 @@ use std::sync::Arc;
 /// # Ok(()) }
 /// ```
 #[derive(Debug, Clone)]
-pub struct EconomicDataService {
+pub struct EconomicProviderService {
     fred: Option<Arc<dyn EconomicProvider>>,
     bea: Option<Arc<dyn EconomicProvider>>,
     census: Option<Arc<dyn EconomicProvider>>,
 }
 
-impl EconomicDataService {
+impl EconomicProviderService {
     /// Return a builder for constructing an [`EconomicDataService`].
-    pub fn builder() -> EconomicDataServiceBuilder {
-        EconomicDataServiceBuilder::default()
+    pub fn builder() -> EconomicProviderServiceBuilder {
+        EconomicProviderServiceBuilder::default()
     }
 
     /// Fetch a FRED time series. `series_id` is a plain FRED series code such as `"CPIAUCSL"`.
@@ -82,13 +82,13 @@ impl EconomicDataService {
 
 /// Builder for [`EconomicDataService`]. All providers are optional.
 #[derive(Debug, Default)]
-pub struct EconomicDataServiceBuilder {
+pub struct EconomicProviderServiceBuilder {
     fred: Option<Arc<dyn EconomicProvider>>,
     bea: Option<Arc<dyn EconomicProvider>>,
     census: Option<Arc<dyn EconomicProvider>>,
 }
 
-impl EconomicDataServiceBuilder {
+impl EconomicProviderServiceBuilder {
     pub fn with_fred(mut self, provider: Arc<dyn EconomicProvider>) -> Self {
         self.fred = Some(provider);
         self
@@ -104,8 +104,8 @@ impl EconomicDataServiceBuilder {
         self
     }
 
-    pub fn build(self) -> EconomicDataService {
-        EconomicDataService {
+    pub fn build(self) -> EconomicProviderService {
+        EconomicProviderService {
             fred: self.fred,
             bea: self.bea,
             census: self.census,

@@ -1,12 +1,12 @@
 [workspace]
 resolver = "2"
 members = [
-    "bin/api", 
+    "bin/api", "bin/pipeline", 
     "crates/rustic-agent",
     "crates/rustic-boot", 
     "crates/rustic-core", "crates/rustic-economic", 
     "crates/rustic-ml"
-    , "crates/rustic-providers", "crates/rustic-storage"]
+    , "crates/rustic-providers", "crates/rustic-storage" ]
 
 [workspace.dependencies]
 anyhow = "1.0.100"

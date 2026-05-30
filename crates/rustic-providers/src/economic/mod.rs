@@ -8,6 +8,6 @@ pub mod types;
 pub use bea::BeaClient;
 pub use census::CensusClient;
 pub use fred::FredClient;
-pub use service::{EconomicDataService, EconomicDataServiceBuilder};
+pub use service::{EconomicProviderService, EconomicProviderServiceBuilder};
 pub use traits::EconomicProvider;
 pub use types::{DataPoint, SeriesData, SeriesInfo};

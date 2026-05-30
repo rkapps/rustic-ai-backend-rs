@@ -53,30 +53,31 @@ impl Tool for CensusDataTool {
 
     fn parameters(&self) -> Value {
         json!({
-            "type": "object",
-            "properties": {
-                "year": {
-                    "type": "string",
-                    "description": "Data year. Use 2023 (latest available).",
-                    "default": "2023"
-                },
-                "dataset": {
-                    "type": "string",
-                    "enum": ["acs1", "acs5"],
-                    "description": "acs1=1-year estimates, acs5=5-year estimates (includes rural areas)"
-                },
-                "variables": {
-                    "type": "array",
-                    "items": { "type": "string" },
-                    "description": "ACS variable codes e.g. B19013_001E (median income), B01003_001E (population)"
-                },
-                "geo": {
-                    "type": "string",
-                    "description": "Geography scope. Examples: 'state:*' (all states), 'state:04' (Arizona), 'county:*&in=state:04' (AZ counties), 'us:1' (national)"
-                }
-            },
-            "required": ["year", "dataset", "variables", "geo"]
-        })
+                    "type": "object",
+                    "properties": {
+                        "year": {
+                            "type": "string",
+                            "description": "Data year. Use 2023 (latest available).",
+                            "default": "2023"
+                        },
+                        "dataset": {
+                            "type": "string",
+                            "enum": ["acs1", "acs5"],
+                            "description": "acs1=1-year estimates, acs5=5-year estimates (includes rural areas)"
+                        },
+                        "variables": {
+                            "type": "array",
+                            "items": { "type": "string" },
+                            "description": "ACS variable codes e.g. B19013_001E (median income), B01003_001E (population)"
+                        },
+                        "geo_fips": {
+                            "type": "string",
+                            "description": "Filter by specific geo. States: 04000=Arizona, 48000=Texas, 06000=California
+                                    Counties: 04013=Maricopa AZ, 48453=Travis TX. Omit to return all available geos."
+                        }
+                    },
+                    "required": ["year", "dataset", "variables"]
+                })
     }
 
     async fn execute(&self, params: Value) -> Result<Value> {
@@ -87,23 +88,19 @@ impl Tool for CensusDataTool {
             .filter_map(|v| v.as_str())
             .collect();
 
-        let geo = params["geo"]
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("geo required"))?;
-
         let dataset = params["dataset"].as_str().unwrap_or("acs5");
-
-        let year = params["year"].as_str().unwrap_or("2023");
+        let year = params["year"].as_str().unwrap_or("LAST5");
+        let geo_fips = params["geo_fips"].as_str().unwrap_or("STATE");
 
         let records = self
             .service
-            .get_census_data(&variables, geo, dataset, year)
+            .get_census_data(&variables, dataset, year, geo_fips)
             .await?;
 
         // census
         Ok(json!({
             "dataset": dataset,
-            "geo": geo,
+            "geo": geo_fips,
             "year": year,
             "records": records
         }))

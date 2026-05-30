@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
+use crate::domain::{
+    BEA_NIPA_COLLECTION, BEA_REGIONAL_COLLECTION, BeaNipaData, BeaRegionalData, CENSUS_COLLECTION,
+    CensusData, ECONOMIC_SERIES_COLLECTION, EconomicSeries,
+};
 use anyhow::Result;
 use rustic_storage::{
     MongoDatabase, Repository, SearchCriteria, mongo::repository::MongoRepository,
 };
 use tokio::sync::Mutex;
-use crate::domain::{BEA_NIPA_COLLECTION, BEA_REGIONAL_COLLECTION, BeaNipaData, BeaRegionalData, CENSUS_COLLECTION, CensusData, ECONOMIC_SERIES_COLLECTION, EconomicSeries};
-
 
 #[derive(Debug)]
 pub struct EconomicStorageManager {
@@ -16,11 +18,40 @@ pub struct EconomicStorageManager {
 impl EconomicStorageManager {
     pub async fn new(uri: &str, name: &str) -> Result<Self> {
         let mut mdb = MongoDatabase::new(uri, name).await?;
-        mdb.register_collection::<String, EconomicSeries>(ECONOMIC_SERIES_COLLECTION.to_owned()).await?;
-        mdb.register_collection::<String, BeaNipaData>(BEA_NIPA_COLLECTION.to_owned()).await?;
-        mdb.register_collection::<String, BeaRegionalData>(BEA_REGIONAL_COLLECTION.to_owned()).await?;
-        mdb.register_collection::<String, CensusData>(CENSUS_COLLECTION.to_owned()).await?;
+        mdb.register_collection::<String, EconomicSeries>(ECONOMIC_SERIES_COLLECTION.to_owned())
+            .await?;
+        mdb.register_collection::<String, BeaNipaData>(BEA_NIPA_COLLECTION.to_owned())
+            .await?;
+        mdb.register_collection::<String, BeaRegionalData>(BEA_REGIONAL_COLLECTION.to_owned())
+            .await?;
+        mdb.register_collection::<String, CensusData>(CENSUS_COLLECTION.to_owned())
+            .await?;
         Ok(Self { db: mdb })
+    }
+
+    // private collection accessors
+    async fn economic_series(&self) -> Result<Arc<Mutex<MongoRepository<String, EconomicSeries>>>> {
+        self.db
+            .collection::<String, EconomicSeries>(ECONOMIC_SERIES_COLLECTION.to_string())
+            .await
+    }
+
+    async fn bea_nipa(&self) -> Result<Arc<Mutex<MongoRepository<String, BeaNipaData>>>> {
+        self.db
+            .collection::<String, BeaNipaData>(BEA_NIPA_COLLECTION.to_string())
+            .await
+    }
+
+    async fn bea_regional(&self) -> Result<Arc<Mutex<MongoRepository<String, BeaRegionalData>>>> {
+        self.db
+            .collection::<String, BeaRegionalData>(BEA_REGIONAL_COLLECTION.to_string())
+            .await
+    }
+
+    async fn census(&self) -> Result<Arc<Mutex<MongoRepository<String, CensusData>>>> {
+        self.db
+            .collection::<String, CensusData>(CENSUS_COLLECTION.to_string())
+            .await
     }
 
     // FRED
@@ -46,6 +77,7 @@ impl EconomicStorageManager {
         };
         let mut repo = repo.lock().await;
         let criteria = SearchCriteria::new().eq("active", true);
+
         repo.find(Some(criteria)).await
     }
 
@@ -83,6 +115,37 @@ impl EconomicStorageManager {
         repo.update(data).await
     }
 
+    pub async fn get_bea_nipa_by_table(
+        &self,
+        table_name: &str,
+        year: &str,
+    ) -> Result<Vec<BeaNipaData>> {
+        let Ok(repo) = self.bea_nipa().await else {
+            return Err(anyhow::anyhow!("Error getting BeaNipa Repository"));
+        };
+        let mut repo = repo.lock().await;
+
+        let criteria = SearchCriteria::new()
+            .eq("table_name", table_name)
+            .eq("time_period", year);
+        repo.find(Some(criteria)).await
+    }
+
+    pub async fn get_bea_regional_by_table(
+        &self,
+        table_name: &str,
+        year: &str,
+    ) -> Result<Vec<BeaRegionalData>> {
+        let Ok(repo) = self.bea_regional().await else {
+            return Err(anyhow::anyhow!("Error getting BeaRegional Repository"));
+        };
+        let mut repo = repo.lock().await;
+
+        let criteria = SearchCriteria::new()
+            .eq("code", table_name)
+            .eq("time_period", year);
+        repo.find(Some(criteria)).await
+    }
     // Census
     pub async fn get_census(&self, id: &str) -> Result<Option<CensusData>> {
         let Ok(repo) = self.census().await else {
@@ -100,20 +163,20 @@ impl EconomicStorageManager {
         repo.update(data).await
     }
 
-    // private collection accessors
-    async fn economic_series(&self) -> Result<Arc<Mutex<MongoRepository<String, EconomicSeries>>>> {
-        self.db.collection::<String, EconomicSeries>(ECONOMIC_SERIES_COLLECTION.to_string()).await
-    }
-
-    async fn bea_nipa(&self) -> Result<Arc<Mutex<MongoRepository<String, BeaNipaData>>>> {
-        self.db.collection::<String, BeaNipaData>(BEA_NIPA_COLLECTION.to_string()).await
-    }
-
-    async fn bea_regional(&self) -> Result<Arc<Mutex<MongoRepository<String, BeaRegionalData>>>> {
-        self.db.collection::<String, BeaRegionalData>(BEA_REGIONAL_COLLECTION.to_string()).await
-    }
-
-    async fn census(&self) -> Result<Arc<Mutex<MongoRepository<String, CensusData>>>> {
-        self.db.collection::<String, CensusData>(CENSUS_COLLECTION.to_string()).await
+    pub async fn get_census_by_variable(
+        &self,
+        dataset: &str,
+        year: &str,
+        variable: &str,
+    ) -> Result<Vec<CensusData>> {
+        let Ok(repo) = self.census().await else {
+            return Err(anyhow::anyhow!("Error getting Census Repository"));
+        };
+        let mut repo = repo.lock().await;
+        let criteria = SearchCriteria::new()
+            .eq("dataset", dataset)
+            .eq("year", year)
+            .eq("variable", variable);
+        repo.find(Some(criteria)).await
     }
 }

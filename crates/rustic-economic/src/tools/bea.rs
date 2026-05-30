@@ -74,10 +74,6 @@ impl Tool for BeaDataTool {
                     "type": "string",
                     "description": "Year e.g. 2024, or LAST5 for last 5 years. Default: LAST5"
                 },
-                "line_code": {
-                    "type": "string",
-                    "description": "Line code for regional data. Default: 1 (total)"
-                },
                 "geo_fips": {
                     "type": "string",
                     "description": "Geographic FIPS for regional data. STATE = all states, 00000 = US total. Default: STATE"
@@ -95,23 +91,22 @@ impl Tool for BeaDataTool {
         let table_name = params["table_name"]
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("table_name required"))?;
-        let frequency = params["frequency"].as_str().unwrap_or("A");
+        // let frequency = params["frequency"].as_str().unwrap_or("A");
         let year = params["year"].as_str().unwrap_or("LAST5");
 
         info!(
-            "Dataset: {:?} Table Name: {:?} frequency: {:?} year: {:?}",
-            dataset, table_name, frequency, year
+            "Dataset: {:?} Table Name: {:?} year: {:?}",
+            dataset, table_name, year
         );
 
         match dataset {
             "nipa" => {
                 let rows = self.service
-                    .get_bea_nipa(table_name, frequency, year)
+                    .get_bea_nipa(table_name, year)
                     .await?;
                 Ok(json!({
                     "dataset":    dataset,
                     "table_name": table_name,
-                    "frequency":  frequency,
                     "year":       year,
                     "data":       rows,
                     "provider":   "bea"
@@ -122,7 +117,7 @@ impl Tool for BeaDataTool {
                 let geo_fips = params["geo_fips"].as_str().unwrap_or("STATE");
 
                 let rows = self.service
-                    .get_bea_regional(table_name, line_code, geo_fips, year)
+                    .get_bea_regional(table_name, geo_fips, year)
                     .await?;
                 Ok(json!({
                     "dataset":    dataset,

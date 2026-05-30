@@ -100,7 +100,6 @@ Key variables:
 
 geo: state:* | county:* | us:1
 dataset: acs1 (1-year) | acs5 (5-year, includes rural areas)
-year: 2023 is latest available
 
 ### census_data geo format
 

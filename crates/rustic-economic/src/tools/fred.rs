@@ -36,18 +36,13 @@ impl Tool for FredSeriesTool {
                     "type": "string",
                     "description": "FRED series ID e.g. CPIAUCSL, UMCSENT, UNRATE, HOUST"
                 },
-                "frequency": {
-                    "type": "string",
-                    "enum": ["m", "q", "a"],
-                    "description": "m=monthly, q=quarterly, a=annual"
-                },
                 "limit": {
                     "type": "integer",
                     "description": "Number of observations to return. Default 3.",
                     "default": 3
                 }
             },
-            "required": ["series_id", "frequency"]
+            "required": ["series_id"]
         })
     }
 
@@ -56,12 +51,11 @@ impl Tool for FredSeriesTool {
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("series_id required"))?;
 
-        let frequency = params["frequency"].as_str();
         let limit = params["limit"].as_u64().map(|n| n as usize);
 
         let data_points = self
             .service
-            .get_fred_series(series_id, frequency, limit)
+            .get_fred_series(series_id, limit)
             .await?;
 
         Ok(json!({
