@@ -89,6 +89,15 @@ impl MongoCriteriaBuilder {
                     };
                     filter.insert(key, doc! { "$exists": exists_value });
                 }
+                SearchOp::StartsWith => {
+                    filter.insert(
+                        key,
+                        doc! {
+                            "$regex": format!("^{}", bson_value.as_str().unwrap_or("")),
+                            "$options": "i"
+                        },
+                    );
+                }
             }
         }
 

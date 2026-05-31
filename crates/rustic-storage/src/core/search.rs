@@ -70,6 +70,8 @@ pub enum SearchOp {
     Contains,
     /// Field exists (or does not exist) in the document (`$exists`).
     Exists,
+    /// Field value starts with.
+    StartsWith
 }
 
 /// The right-hand side of a [`SearchCondition`].
@@ -195,6 +197,11 @@ impl SearchCriteria {
     /// Field exists (`true`) or does not exist (`false`) in the document.
     pub fn exists(self, field: &str, exists: bool) -> Self {
         self.push(field, SearchOp::Exists, SearchValue::Bool(exists))
+    }
+
+    /// Field value starts with `value` (case-insensitive regex).
+    pub fn starts_with(self, field: &str, value: impl Into<String>) -> Self {
+        self.push(field, SearchOp::StartsWith, SearchValue::String(value.into()))
     }
 
     // --- sort and limit ---
