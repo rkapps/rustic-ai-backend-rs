@@ -56,7 +56,7 @@
           "input_cost_per_1k": 0.00010,
           "cached_read_cost_per_1k": 0.00005,
           "cached_write_cost_per_1k": 0.0,
-          "output_cost_per_1k": 0.00040
+          "output_cost_per_1k": 0.00125
         }
       ]
     },
@@ -72,14 +72,14 @@
           "input_cost_per_1k": 0.000037,
           "cached_read_cost_per_1k": 0.0000093,
           "cached_write_cost_per_1k": 0.0,
-          "output_cost_per_1k": 0.000150
+          "output_cost_per_1k": 0.00150
         },
         {
           "id": "gemini-3-flash-preview",
           "input_cost_per_1k": 0.000075,
           "cached_read_cost_per_1k": 0.0000188,
           "cached_write_cost_per_1k": 0.0,
-          "output_cost_per_1k": 0.000300
+          "output_cost_per_1k": 0.00300
         }
       ]
     },
