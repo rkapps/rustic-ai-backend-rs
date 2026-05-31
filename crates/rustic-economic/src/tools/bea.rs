@@ -1,10 +1,10 @@
+use crate::{helper::geo_type, service::EconomicDataService};
 use anyhow::Result;
 use async_trait::async_trait;
 use rustic_core::Tool;
 use serde_json::{Value, json};
-use tracing::info;
 use std::sync::Arc;
-use crate::service::EconomicDataService;
+use tracing::info;
 
 #[derive(Debug)]
 pub struct BeaDataTool {
@@ -72,11 +72,20 @@ impl Tool for BeaDataTool {
                 },
                 "year": {
                     "type": "string",
-                    "description": "Year e.g. 2024, or LAST5 for last 5 years. Default: LAST5"
+                    "description": "Year or range. Examples: 2024, 2024,2023,2022, LAST5, LAST3, LAST2, LATEST"
                 },
                 "geo_fips": {
                     "type": "string",
-                    "description": "Geographic FIPS for regional data. STATE = all states, 00000 = US total. Default: STATE"
+                    "description": "Specific FIPS code. 06075=San Francisco, 04013=Maricopa"
+                },
+                "geo_type": {
+                    "type": "string",
+                    "enum": ["national", "region", "state", "county", "metro", "division"],
+                    "description": "Filter by geography type"
+                },
+                "state_prefix": {
+                    "type": "string",
+                    "description": "2-digit state code to get all counties in a state. 06=California, 48=Texas, 04=Arizona"
                 }
             },
             "required": ["dataset", "table_name"]
@@ -84,7 +93,6 @@ impl Tool for BeaDataTool {
     }
 
     async fn execute(&self, params: Value) -> Result<Value> {
-
         let dataset = params["dataset"]
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("dataset required"))?;
@@ -101,9 +109,7 @@ impl Tool for BeaDataTool {
 
         match dataset {
             "nipa" => {
-                let rows = self.service
-                    .get_bea_nipa(table_name, year)
-                    .await?;
+                let rows = self.service.get_bea_nipa(table_name, year).await?;
                 Ok(json!({
                     "dataset":    dataset,
                     "table_name": table_name,
@@ -114,10 +120,13 @@ impl Tool for BeaDataTool {
             }
             "regional" => {
                 let line_code = params["line_code"].as_str().unwrap_or("1");
-                let geo_fips = params["geo_fips"].as_str().unwrap_or("STATE");
+                let geo_fips = params["geo_fips"].as_str();
+                let geo_type = params["geo_type"].as_str();
+                let state_prefix = params["state_prefix"].as_str();
 
-                let rows = self.service
-                    .get_bea_regional(table_name, geo_fips, year)
+                let rows = self
+                    .service
+                    .get_bea_regional(table_name, geo_fips, geo_type, state_prefix, year)
                     .await?;
                 Ok(json!({
                     "dataset":    dataset,
@@ -133,6 +142,5 @@ impl Tool for BeaDataTool {
             }
             _ => Err(anyhow::anyhow!("dataset must be 'nipa' or 'regional'")),
         }
-        
     }
 }

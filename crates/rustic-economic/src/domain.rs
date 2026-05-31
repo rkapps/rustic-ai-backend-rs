@@ -1,10 +1,7 @@
 // rustic-economic/src/domain/mod.rs
 
 use chrono::{DateTime, Utc};
-use rustic_providers::{
-    DataPoint,
-    economic::bea::model::{BeaDataRow, BeaRegionalRow},
-};
+use rustic_providers::DataPoint;
 use rustic_storage::RepoModel;
 use serde::{Deserialize, Serialize};
 
@@ -56,6 +53,15 @@ pub enum Frequency {
 }
 
 impl Frequency {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "m" => Frequency::Monthly,
+            "q" => Frequency::Quarterly,
+            "a" => Frequency::Annual,
+            _ => Frequency::Monthly,
+        }
+    }
+
     pub fn as_str(&self) -> &str {
         match self {
             Frequency::Monthly => "m",
@@ -81,7 +87,7 @@ impl EconomicSeries {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BeaNipaData {
-    pub id: String,              // "bea_nipa_T20100_A191RC_2024"
+    pub id: String, // "bea_nipa_T20100_A191RC_2024"
     pub table_name: String,
     pub series_code: String,
     pub line_number: String,
@@ -111,10 +117,11 @@ impl BeaNipaData {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BeaRegionalData {
-    pub id: String,              // "bea_regional_CAINC1_48_2024"
+    pub id: String, // "bea_regional_CAINC1_48_2024"
     pub code: String,
     pub geo_fips: String,
     pub geo_name: String,
+    pub geo_type: String,    // "state" | "county" | "metro"
     pub time_period: String,
     pub data_value: String,
     pub cl_unit: String,
@@ -139,14 +146,14 @@ impl BeaRegionalData {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CensusData {
-    pub id: String,                 // "census_acs5_2023_B19013_001E_04000"
-    pub dataset: String,            // "acs5"
-    pub year: String,               // "2023"
-    pub variable: String,           // "B19013_001E"
-    pub value: String,              // "76872"
-    pub geo_fips: String,           // "04000"
-    pub geo_name: String,           // "Arizona"
-    pub geo_type: Option<String>,   // "state" | "county"
+    pub id: String,               // "census_acs5_2023_B19013_001E_04000"
+    pub dataset: String,          // "acs5"
+    pub year: String,             // "2023"
+    pub variable: String,         // "B19013_001E"
+    pub value: String,            // "76872"
+    pub geo_fips: String,         // "04000"
+    pub geo_name: String,         // "Arizona"
+    pub geo_type: Option<String>, // "state" | "county"
     pub last_refreshed: DateTime<Utc>,
     pub next_refresh: DateTime<Utc>,
 }

@@ -22,6 +22,8 @@ pub struct BeaResults {
     pub unit: Option<String>,
     #[serde(rename = "Data")]
     pub data: Option<serde_json::Value>, // ← flexible, handle both
+    #[serde(rename = "ParamValue")]
+    pub param_value: Option<serde_json::Value>, // ← flexible, handle both
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
@@ -63,6 +65,16 @@ pub struct BeaRegionalRow {
     #[serde(rename = "UNIT_MULT")]
     pub unit_mult: String,
 }
+
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
+pub struct BeaParamValue {
+    #[serde(rename = "Key")]
+    pub key: String,
+    #[serde(rename = "Desc")]
+    pub description: String,
+}
+
 
 #[derive(Debug, Deserialize)]
 pub struct BeaError {

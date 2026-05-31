@@ -1,11 +1,11 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use rustic_core::HttpClient;
-use tracing::info;
 use std::sync::Arc;
+use tracing::info;
 
 use super::model::{BeaDataRow, BeaResponse};
-use crate::economic::bea::model::BeaRegionalRow;
+use crate::economic::bea::model::{BeaParamValue, BeaRegionalRow};
 use crate::economic::traits::EconomicProvider;
 use crate::economic::types::{DataPoint, SeriesData};
 
@@ -31,6 +31,32 @@ impl BeaClient {
             http_client: Arc::new(HttpClient::new()?),
             api_key: api_key.into(),
         })
+    }
+
+    pub async fn get_geo_fips(&self) -> Result<Vec<BeaParamValue>> {
+        // GET /api/data?method=GetParameterValues&datasetname=Regional&ParameterName=GeoFips&TableName=CAINC1
+        let url = format!(
+            "{}?UserID={}&method=GetParameterValues&datasetname=Regional&ParameterName=GeoFips&ResultFormat=JSON",
+            BEA_BASE_URL, self.api_key
+       );
+        info!("Geofips Url: {}", url);
+        let response: BeaResponse = self.http_client.get_request(url, None).await?;
+        if let Some(error) = response.bea_api.error {
+            return Err(anyhow::anyhow!(
+                "BEA error {}: {}",
+                error.code,
+                error.description
+            ));
+        }
+        let data = response
+            .bea_api
+            .results
+            .ok_or_else(|| anyhow::anyhow!("No results"))?
+            .param_value
+            .ok_or_else(|| anyhow::anyhow!("No param values"))?;
+
+        let rows: Vec<BeaParamValue> = serde_json::from_value(data)?;
+        Ok(rows)
     }
 
     /// Fetch rows from a NIPA (National Income and Product Accounts) table.
@@ -198,7 +224,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_bea_regional_raw() {
-
         set_logger("rustic_providers=debug,rustic_core=trace".to_string());
 
         let api_key = std::env::var("BEA_API_KEY").unwrap();
@@ -230,7 +255,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_bea_state_income() {
-
         set_logger("rustic_providers=debug,rustic_core=trace".to_string());
         let api_key = std::env::var("BEA_API_KEY").unwrap();
         let client = BeaClient::new(api_key).unwrap();
@@ -246,7 +270,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_bea_get_series() {
-
         set_logger("rustic_providers=debug,rustic_core=trace".to_string());
 
         let api_key = std::env::var("BEA_API_KEY").expect("BEA_API_KEY not set");

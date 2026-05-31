@@ -1,78 +1,193 @@
 use anyhow::Result;
 use std::sync::Arc;
+use tracing::info;
 
-use crate::service::EconomicDataService;
+use crate::{helper::fips_to_census_geo, service::EconomicDataService};
 
 pub struct EconomicDataPipeline {
     service: Arc<EconomicDataService>,
 }
 
 impl EconomicDataPipeline {
+    pub fn new(service: Arc<EconomicDataService>) -> Self {
+        Self { service }
+    }
+
+    pub async fn clean(&self) -> Result<()> {
+        // self.service.clean_bea().await?;
+        self.service.clean_census().await?;
+        // self.service.clean_fred_series().await?;
+        Ok(())
+    }
+
     pub async fn run(&self) -> Result<()> {
-        tokio::try_join!(self.run_fred(), self.run_bea(), self.run_census(),)?;
+        info!("Economic Data Pipeline started...");
+        // tokio::try_join!(self.run_fred(), self.run_bea(), self.run_census(),)?;
+        // tokio::try_join!(self.run_bea())?;
+
+        // self.service.clean_bea().await?;
+        // if let Err(e) = self.run_bea().await {
+        //     tracing::error!("BEA pipeline failed: {}", e);
+        // } else {
+        //     tracing::info!("BEA pipeline complete");
+        // }
+
+        // self.service.clean_census().await?;
+        if let Err(e) = self.run_census().await {
+            tracing::error!("Census pipeline failed: {}", e);
+        } else {
+            tracing::info!("Census pipeline complete");
+        }
+
+        info!("Economic Data Pipeline done");
         Ok(())
     }
 
     async fn run_fred(&self) -> Result<()> {
         let series = vec![
-            ("CPIAUCSL", "m", 12),
-            ("UMCSENT", "m", 12),
-            ("UNRATE", "m", 12),
-            ("DSPIC96", "m", 12),
-            ("PCE", "m", 12),
-            ("HOUST", "m", 12),
-            ("PERMIT", "m", 12),
-            ("RSFSXMV", "m", 12),
-            ("DFFFRC1A027NBEA", "a", 5),
-            ("DFDHRC1Q027SBEA", "q", 8),
-            ("DCAFRC1A027NBEA", "a", 5),
-            ("DREQRC1Q027SBEA", "q", 8),
+            // (series_id, frequency, limit, name, category, sectors)
+            (
+                "CPIAUCSL",
+                "m",
+                12,
+                "Consumer Price Index",
+                "consumer_health",
+                vec!["all"],
+            ),
+            (
+                "UMCSENT",
+                "m",
+                12,
+                "Consumer Sentiment",
+                "consumer_health",
+                vec!["all"],
+            ),
+            (
+                "UNRATE",
+                "m",
+                12,
+                "Unemployment Rate",
+                "consumer_health",
+                vec!["all"],
+            ),
+            (
+                "DSPIC96",
+                "m",
+                12,
+                "Real Disposable Income",
+                "consumer_health",
+                vec!["all"],
+            ),
+            (
+                "PCE",
+                "m",
+                12,
+                "Personal Consumption Expenditures",
+                "consumer_health",
+                vec!["all"],
+            ),
+            (
+                "HOUST",
+                "m",
+                12,
+                "Housing Starts",
+                "housing",
+                vec!["all", "furniture", "home"],
+            ),
+            (
+                "PERMIT",
+                "m",
+                12,
+                "Building Permits",
+                "housing",
+                vec!["all", "furniture", "home"],
+            ),
+            (
+                "RSFSXMV",
+                "m",
+                12,
+                "Building Materials Retail",
+                "consumer_spending",
+                vec!["furniture", "home"],
+            ),
+            (
+                "DFFFRC1A027NBEA",
+                "a",
+                5,
+                "Furniture and Furnishings",
+                "consumer_spending",
+                vec!["furniture", "home"],
+            ),
+            (
+                "DFDHRC1Q027SBEA",
+                "q",
+                8,
+                "Furnishings Durable Equipment",
+                "consumer_spending",
+                vec!["furniture", "home"],
+            ),
+            (
+                "DCAFRC1A027NBEA",
+                "a",
+                5,
+                "Clothing and Footwear",
+                "consumer_spending",
+                vec!["apparel"],
+            ),
+            (
+                "DREQRC1Q027SBEA",
+                "q",
+                8,
+                "Recreational Goods",
+                "consumer_spending",
+                vec!["recreation"],
+            ),
         ];
 
-        for (series_id, frequency, limit) in series {
+        for (series_id, frequency, limit, name, category, sectors) in series {
             self.service
-                .update_fred_series(series_id, frequency, limit)
+                .update_fred_series(
+                    series_id,
+                    frequency,
+                    limit,
+                    name,
+                    category,
+                    &sectors.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+                )
                 .await?;
         }
         Ok(())
     }
 
     async fn run_bea(&self) -> Result<()> {
-        let years = "2026,2025,2024,2023,2022,2021,2020";
+        // let years = "2026,2025,2024,2023,2022,2021,2020";
+        let years = vec!["2024"];
 
         // NIPA
-        self.service.update_bea_nipa("T20100", "A", years).await?;
+        for year in years.clone() {
+            self.service.update_bea_nipa("T20100", "A", year).await?;
+        }
 
-        // Regional — all states
-        self.service
-            .update_bea_regional("CAINC1", "1", "STATE", years)
-            .await?;
-        self.service
-            .update_bea_regional(
-                "SASUMMARY",
-                "1",
-                "STATE",
-                "2026,2025,2024,2023,2022,2021,2020",
-            )
-            .await?;
+        // Regional — for all geo-fips
+        let geo_fips = self.service.get_geo_fips().await?;
+        info!("geo-fips: {}", geo_fips.len());
 
-        // Regional — key counties
-        let counties = "04013,48453,48491,06037,36061,12086";
-        self.service
-            .update_bea_regional(
-                "CAINC1",
-                "1",
-                counties,
-                "2026,2025,2024,2023,2022,2021,2020",
-            )
-            .await?;
+        let tables: Vec<(&str, &str)> = vec![
+            ("CAINC1", "1"),
+            ("CAINC4", "10"),
+            ("CAINC5N", "10"),
+            ("CAINC5S", "10"),
+            ("SASUMMARY", "1"),
+            ("CAGDP1", "1"),
+        ];
 
+        self.service.update_bea_regional(tables, &geo_fips, &years).await?;
         Ok(())
     }
 
     async fn run_census(&self) -> Result<()> {
         let variables = vec![
-            "B19013_001E", // median income
+            // "B19013_001E", // median income
             "B01002_001E", // median age
             "B01003_001E", // population
             "B25003_002E", // owner occupied
@@ -81,39 +196,15 @@ impl EconomicDataPipeline {
             "B23025_005E", // unemployed
         ];
 
+        // let years = vec!["2026", "2025", "2024", "2023", "2022", "2021", "2020"];
+        // Regional — for all geo-fips
+        let geo_fips = self.service.get_geo_fips().await?;
+        info!("geo-fips: {}", geo_fips.len());
+
         let vars: Vec<&str> = variables.iter().map(|s| *s).collect();
+        let years = vec!["2024"];
 
-        let years = vec!["2026", "2025", "2024", "2023", "2022", "2021", "2020"];
-        // all counties for all states
-        let states = vec![
-            "01", "02", "04", "05", "06", "08", "09", "10", "11", "12", "13", "15", "16", "17",
-            "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31",
-            "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "44", "45", "46",
-            "47", "48", "49", "50", "51", "53", "54", "55", "56",
-        ];
-
-        // all states
-        for year in years {
-            self.service
-                .update_census_data(
-                    &variables.iter().map(|s| *s).collect::<Vec<_>>(),
-                    "state:*",
-                    "acs5",
-                    year,
-                )
-                .await?;
-
-            for state in &states {
-                self.service
-                    .update_census_data(
-                        &vars,
-                        &format!("county:*&in=state:{}", state),
-                        "acs5",
-                        year,
-                    )
-                    .await?;
-            }
-        }
+        self.service.update_census("acs5", &vars, years, geo_fips).await?;
 
         Ok(())
     }

@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use rustic_core::HttpClient;
 use std::sync::Arc;
-use tracing::info;
+use tracing::{debug, info};
 
 use super::model::{CensusRawResponse, CensusRecord};
 use crate::economic::traits::EconomicProvider;
@@ -118,7 +118,9 @@ impl CensusClient {
             .collect();
 
         let mut records = Vec::new();
-
+        info!("Census headers: {:?}", headers);
+        info!("Census first row: {:?}", raw.get(1));
+        
         for row in &raw[1..] {
             let geo_name = name_idx
                 .and_then(|i| row.get(i))
