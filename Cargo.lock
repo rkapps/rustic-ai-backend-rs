@@ -3114,10 +3114,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
-name = "pipeline"
-version = "0.1.0"
-
-[[package]]
 name = "pkcs8"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3839,6 +3835,18 @@ dependencies = [
  "tokenizers 0.19.1",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "rustic-pipeline"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "rustic-core",
+ "rustic-economic",
+ "rustic-providers",
+ "rustic-storage",
+ "tokio",
 ]
 
 [[package]]

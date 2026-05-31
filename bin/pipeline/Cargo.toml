@@ -1,6 +1,13 @@
 [package]
-name = "pipeline"
+name = "rustic-pipeline"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+anyhow.workspace = true
+tokio.workspace = true
+
+rustic-core.workspace=true
+rustic-economic.workspace = true
+rustic-providers.workspace=true
+rustic-storage.workspace = true
