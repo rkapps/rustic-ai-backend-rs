@@ -272,7 +272,7 @@ impl ConversationService {
                         .agent_service
                         .build_agent_handle(
                             None,
-                            &agent_id,
+                            agent_id,
                             &conversation.llm,
                             &conversation.model,
                             None,
@@ -282,7 +282,7 @@ impl ConversationService {
                     let response = handle.execute(messages).await?;
                     Ok(response)
                 } else {
-                    return Err(anyhow::anyhow!("Conversation agent_id is blank."));
+                    Err(anyhow::anyhow!("Conversation agent_id is blank."))
                 }
             }
         }
@@ -314,10 +314,10 @@ impl ConversationService {
                         .agent_service
                         .build_agent_handle(
                             None,
-                            &agent_id,
+                            agent_id,
                             &conversation.llm,
                             &conversation.model,
-                            None,                            
+                            None,
                             &mut visited,
                         )
                         .await?;
@@ -326,7 +326,7 @@ impl ConversationService {
                     let stream = handle.execute_streaming(messages).await?;
                     Ok(Box::pin(stream))
                 } else {
-                    return Err(anyhow::anyhow!("Conversation agent_id is blank."));
+                    Err(anyhow::anyhow!("Conversation agent_id is blank."))
                 }
             }
         }

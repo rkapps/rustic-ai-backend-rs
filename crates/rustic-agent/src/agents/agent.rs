@@ -61,7 +61,6 @@ pub struct Agent {
 }
 
 impl Agent {
-
     /// Run an agentic tool-use loop, streaming output chunks to the caller.
     ///
     /// Spawns a background Tokio task that drives the loop and forwards
@@ -88,14 +87,18 @@ impl Agent {
             .map(|e| ToolDefinition::from_tool(e.as_ref()))
             .collect();
 
-        debug!(target: "agent-tool", 
-            defintions= ?definitions, 
-            "Agent: {} - Tool definitions", self.id);
+        debug!(
+            target: "agent-tool",
+            defintions= ?definitions,
+            "Agent: {} - Tool definitions", self.id
+        );
 
         let mcp_definitions = self.mcp_registry.definitions.clone();
-        debug!(target: "agent-tool", 
-            defintions= ?mcp_definitions, 
-            "Agent: {} - Mcp_definitions", self.id);
+        debug!(
+            target: "agent-tool",
+            defintions= ?mcp_definitions,
+            "Agent: {} - Mcp_definitions", self.id
+        );
 
         mcp_definitions
             .iter()
@@ -211,9 +214,9 @@ impl Agent {
                 );
 
                 if tool_calls.is_empty() {
-                    info!(  
-                        model=%model, 
-                        response_id= ?response_id, 
+                    info!(
+                        model=%model,
+                        response_id= ?response_id,
                         usage= %format_args!("{:#?}", usage),
                         "Agent: {} - Response Stats final", agent_id
                     );
@@ -255,11 +258,11 @@ impl Agent {
                     match result {
                         Ok((tool_call, tool_output)) => {
                             // debug!(target: "agent-tool", tool_call= ?tool_call, "Tool Call");
-                            debug!(target: "agent-tool", 
+                            debug!(target: "agent-tool",
                                 tool_call= ?tool_call,
                                 "Agent: {} - ", agent_id
                             );
-                            debug!(target: "agent-tool", 
+                            debug!(target: "agent-tool",
                                 tool_output= ?tool_output,
                                 "Agent: {} - ", agent_id
                             );
@@ -267,12 +270,10 @@ impl Agent {
                             nmessages.push(tool_output);
                         }
                         Err(e) => {
-
-                            error!(target: "agent-tool", 
+                            error!(target: "agent-tool",
                                 error= ?e,
                                 "Agent: {} - Tool Call Error", agent_id
                             );
-
                         }
                     };
                 }
@@ -307,20 +308,18 @@ impl Agent {
             .map(|e| ToolDefinition::from_tool(e.as_ref()))
             .collect();
 
-
         debug!(target: "agent-messages",
           "Agent: {} - Current messages: {:#?}", agent_id, messages
         );
-        debug!(target: "agent-tool", 
-            defintions= ?definitions, 
+        debug!(target: "agent-tool",
+            defintions= ?definitions,
             "Agent: {} - Tool definitions", self.id
         );
 
-
         let mcp_definitions = self.mcp_registry.definitions.clone();
 
-        debug!(target: "agent-tool", 
-            defintions= ?mcp_definitions, 
+        debug!(target: "agent-tool",
+            defintions= ?mcp_definitions,
             "Agent: {} - Mcp_definitions", self.id
         );
 
@@ -330,7 +329,6 @@ impl Agent {
             maxtokens= %agent.max_tokens,
             "Agent: {} - Completion Start", agent_id
         );
-
 
         mcp_definitions
             .iter()
@@ -393,23 +391,20 @@ impl Agent {
                 .collect();
 
             if tool_calls.is_empty() {
-                
-                info!(  
+                info!(
                     response= %format_args!("{:#?}", response.text() ),
                     usage= %format_args!("{:#?}", response.usage),
                     "Agent: {} - Response Stats final", agent_id
                 );
 
-
                 return Ok(response); // Done - return final answer
             }
 
-            info!(  
-                tool_calls= ?tool_calls.len(), 
-                response_id= ?response.response_id, 
+            info!(
+                tool_calls= ?tool_calls.len(),
+                response_id= ?response.response_id,
                 "Agent: {} - Response Stats final", agent_id
             );
-
 
             trace!("CompletionResponse: {:#?}", response);
 
@@ -457,7 +452,6 @@ impl Agent {
             for result in results {
                 match result {
                     Ok((tool_call, tool_output)) => {
-
                         debug!(target: "agent-tool", tool_call= ?tool_call, "Agent: {} - ", agent_id);
                         debug!(target: "agent-tool", tool_output= ?tool_output, "Agent: {} - ", agent_id );
                         nmessages.push(tool_call);
@@ -491,9 +485,8 @@ impl Agent {
 
         let output = match self.tool_registry.get_tool(&call.name) {
             Some(tool) => {
-
-                info!(target: "agent-tool", 
-                    name= ?call.name, 
+                info!(target: "agent-tool",
+                    name= ?call.name,
                     arguments= ?call.arguments,
                     "Agent: {} - Executing tool...", agent_id
                 );
@@ -502,9 +495,8 @@ impl Agent {
             }
             None => {
                 if self.mcp_registry.has_tool(&call.name) {
-
-                    info!(target: "agent-tool", 
-                        name= ?call.name, 
+                    info!(target: "agent-tool",
+                        name= ?call.name,
                         arguments= ?call.arguments,
                         "Agent: {} - Executing Mcp tool...", agent_id
                     );
@@ -516,19 +508,20 @@ impl Agent {
                     {
                         Ok(c) => c,
                         Err(e) => {
-
-                            error!(target: "agent-tool", 
-                                error= ?e, 
+                            error!(
+                                target: "agent-tool",
+                                error= ?e,
                                 arguments= ?call.arguments,
-                                "Agent: {} - Executing McpTool error...", agent_id);
-        
+                                "Agent: {} - Executing McpTool error...", agent_id
+                            );
+
                             serde_json::json!({
                                 "error": format!("{:?}", e)
                             })
                         }
                     }
                 } else {
-                    error!(target: "agent-tool", 
+                    error!(target: "agent-tool",
                         name= %call.name,
                         "Agent: {} - Tool not found...", agent_id
                     );

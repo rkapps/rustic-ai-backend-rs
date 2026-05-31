@@ -4,7 +4,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use eventsource_stream::Eventsource;
 use futures::StreamExt;
-use rustic_core::{HttpError,HttpClient, HttpResult};
+use rustic_core::{HttpClient, HttpError, HttpResult};
 use serde_json::Value;
 use tracing::{debug, error, trace};
 

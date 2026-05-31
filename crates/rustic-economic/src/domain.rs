@@ -1,5 +1,7 @@
 // rustic-economic/src/domain/mod.rs
 
+use std::str::FromStr;
+
 use chrono::{DateTime, Utc};
 use rustic_providers::DataPoint;
 use rustic_storage::RepoModel;
@@ -52,16 +54,21 @@ pub enum Frequency {
     Annual,    // a
 }
 
-impl Frequency {
-    pub fn from_str(s: &str) -> Self {
+impl FromStr for Frequency {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "m" => Frequency::Monthly,
-            "q" => Frequency::Quarterly,
-            "a" => Frequency::Annual,
-            _ => Frequency::Monthly,
+            "m" => Ok(Frequency::Monthly),
+            "q" => Ok(Frequency::Quarterly),
+            "a" => Ok(Frequency::Annual),
+            _ => Ok(Frequency::Monthly),
         }
     }
+}
 
+impl Frequency {
+ 
     pub fn as_str(&self) -> &str {
         match self {
             Frequency::Monthly => "m",
@@ -121,7 +128,7 @@ pub struct BeaRegionalData {
     pub code: String,
     pub geo_fips: String,
     pub geo_name: String,
-    pub geo_type: String,    // "state" | "county" | "metro"
+    pub geo_type: String, // "state" | "county" | "metro"
     pub time_period: String,
     pub data_value: String,
     pub cl_unit: String,

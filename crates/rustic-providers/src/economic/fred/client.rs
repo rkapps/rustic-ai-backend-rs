@@ -1,8 +1,8 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use rustic_core::HttpClient;
-use tracing::info;
 use std::sync::Arc;
+use tracing::info;
 
 use super::model::{FredObservationsResponse, FredSeriesResponse};
 use crate::economic::{

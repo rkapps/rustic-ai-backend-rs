@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use rustic_core::HttpClient;
 use std::sync::Arc;
-use tracing::{debug, info};
+use tracing::info;
 
 use super::model::{CensusRawResponse, CensusRecord};
 use crate::economic::traits::EconomicProvider;
@@ -120,7 +120,7 @@ impl CensusClient {
         let mut records = Vec::new();
         info!("Census headers: {:?}", headers);
         info!("Census first row: {:?}", raw.get(1));
-        
+
         for row in &raw[1..] {
             let geo_name = name_idx
                 .and_then(|i| row.get(i))
@@ -131,8 +131,8 @@ impl CensusClient {
 
             for (variable, idx) in &variable_indices {
                 records.push(CensusRecord {
-                    geo_fips: geo_fips.clone(),                // actual fips value e.g. "04"
-                    geo_name: geo_name.clone(),                        // "Arizona"
+                    geo_fips: geo_fips.clone(),      // actual fips value e.g. "04"
+                    geo_name: geo_name.clone(),      // "Arizona"
                     geo_type: Some(geo_col.clone()), // "state" | "county" | "us"
                     variable: variable.to_string(),
                     value: row.get(*idx).cloned().unwrap_or_default(),

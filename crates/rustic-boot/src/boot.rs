@@ -294,7 +294,7 @@ impl AgenticBootBuilder {
         let conversation_service = match (mongo_uri, mongo_db) {
             (Some(mongo_uri), Some(mongo_db)) => {
                 info!("Connecting to MongoDB: {}/{}", mongo_uri, mongo_db);
-                let storage_manager = BootStorageManager::new(&mongo_uri, &mongo_db).await?;
+                let storage_manager = BootStorageManager::new(mongo_uri, mongo_db).await?;
 
                 Some(Arc::new(ConversationService::new(
                     Arc::new(agent_service.clone()),
@@ -339,7 +339,10 @@ impl AgenticBootBuilder {
                 agent_config.id, tool_id
             ),
             None => {
-                info!("   Registered agent: {} preset: {:?}", agent_config.id, agent_config.preset);
+                info!(
+                    "   Registered agent: {} preset: {:?}",
+                    agent_config.id, agent_config.preset
+                );
                 agent_registry.register_agent(agent_config);
             }
         }

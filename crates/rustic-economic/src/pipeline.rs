@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::sync::Arc;
 use tracing::info;
 
-use crate::{helper::fips_to_census_geo, service::EconomicDataService};
+use crate::service::EconomicDataService;
 
 pub struct EconomicDataPipeline {
     service: Arc<EconomicDataService>,
@@ -181,12 +181,14 @@ impl EconomicDataPipeline {
             ("CAGDP1", "1"),
         ];
 
-        self.service.update_bea_regional(tables, &geo_fips, &years).await?;
+        self.service
+            .update_bea_regional(tables, &geo_fips, &years)
+            .await?;
         Ok(())
     }
 
     async fn run_census(&self) -> Result<()> {
-        let variables = vec![
+        let variables = [
             // "B19013_001E", // median income
             "B01002_001E", // median age
             "B01003_001E", // population
@@ -201,10 +203,12 @@ impl EconomicDataPipeline {
         let geo_fips = self.service.get_geo_fips().await?;
         info!("geo-fips: {}", geo_fips.len());
 
-        let vars: Vec<&str> = variables.iter().map(|s| *s).collect();
+        let vars: Vec<&str> = variables.to_vec();
         let years = vec!["2024"];
 
-        self.service.update_census("acs5", &vars, years, geo_fips).await?;
+        self.service
+            .update_census("acs5", &vars, years, geo_fips)
+            .await?;
 
         Ok(())
     }

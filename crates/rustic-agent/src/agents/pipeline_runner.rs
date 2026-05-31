@@ -132,7 +132,7 @@ impl AgentHandle {
     /// is forwarded so the nested pipeline starts fresh rather than inheriting outer context.
     pub async fn execute(&self, original_messages: &[Message]) -> HttpResult<CompletionResponse> {
         match self {
-            AgentHandle::Single(agent) => agent.complete(&original_messages).await,
+            AgentHandle::Single(agent) => agent.complete(original_messages).await,
             AgentHandle::Pipeline(runner) => {
                 // force pipeline runner to be stateless
                 let last = original_messages.last().unwrap();
@@ -152,7 +152,7 @@ impl AgentHandle {
         original_messages: &[Message],
     ) -> HttpResult<ReceiverStream<HttpResult<CompletionChunkResponse>>> {
         match self {
-            AgentHandle::Single(agent) => agent.complete_with_streaming(&original_messages).await,
+            AgentHandle::Single(agent) => agent.complete_with_streaming(original_messages).await,
             AgentHandle::Pipeline(runner) => {
                 let input = vec![original_messages.last().unwrap().clone()];
                 Box::pin(runner.clone().run_dynamic_streaming(&input)).await
@@ -354,8 +354,8 @@ impl PipeLineRunner {
             // if the decision is stop then return the response.
             if decision.stop {
                 let final_content = unwrap_agent_content(&merged);
-                let mut rcontents: Vec<CompletionResponseContent> = Vec::new();
-                rcontents.push(CompletionResponseContent::Text(final_content));
+                let rcontents =vec![CompletionResponseContent::Text(final_content)];
+                // rcontents.push();
                 let rresponse = CompletionResponse {
                     id: response.id,
                     model: response.model,
@@ -660,7 +660,7 @@ impl PipeLineRunner {
                                 &sub_agent,
                                 decision.goal.clone(),
                                 original_messages,
-                                &pipeline_messages,
+                                pipeline_messages,
                             )
                             .await?;
 
@@ -700,7 +700,7 @@ impl PipeLineRunner {
                                     &id,
                                     decision.goal.clone(),
                                     &all_msgs,
-                                    &pipeline_msgs,
+                                    pipeline_msgs,
                                 ),
                             )
                             .await

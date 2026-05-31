@@ -157,7 +157,6 @@ impl EconomicStorageManager {
         repo.bulk_update(datas).await
     }
 
-
     pub async fn get_bea_nipa_by_table(
         &self,
         table_name: &str,
@@ -186,13 +185,10 @@ impl EconomicStorageManager {
 
         let criteria = SearchCriteria::new()
             .eq("code", table_name)
-            .eq("time_period", year)
-            ;
-
+            .eq("time_period", year);
 
         repo.find(Some(criteria)).await
     }
-
 
     pub async fn get_bea_regional_filtered(
         &self,
@@ -209,7 +205,7 @@ impl EconomicStorageManager {
         let mut criteria = SearchCriteria::new()
             .eq("code", table_name)
             .eq("time_period", year);
-    
+
         if let Some(fips) = geo_fips {
             criteria = criteria.eq("geo_fips", fips);
         }
@@ -219,10 +215,9 @@ impl EconomicStorageManager {
         if let Some(prefix) = state_prefix {
             criteria = criteria.starts_with("geo_fips", prefix);
         }
-    
-        repo.find(Some(criteria)).await
-    }    
 
+        repo.find(Some(criteria)).await
+    }
 
     // Census
     pub async fn delete_all_census(&self) -> Result<()> {
@@ -242,7 +237,6 @@ impl EconomicStorageManager {
         Ok(repo.find_by_id(id.to_owned()).await.ok())
     }
 
-
     pub async fn upsert_census_bulk(&self, datas: Vec<CensusData>) -> Result<()> {
         let Ok(repo) = self.census().await else {
             return Err(anyhow::anyhow!("Error getting Census Repository"));
@@ -250,7 +244,6 @@ impl EconomicStorageManager {
         let mut repo = repo.lock().await;
         repo.bulk_update(datas).await
     }
-
 
     pub async fn upsert_census(&self, data: CensusData) -> Result<()> {
         let Ok(repo) = self.census().await else {

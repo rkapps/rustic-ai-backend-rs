@@ -195,11 +195,7 @@ impl AgentService {
         model: &str,
         visited: &mut HashSet<String>,
     ) -> Result<PipeLineRunner> {
-
-        debug!(
-           "Agent: {} - Build Pipeline Runner", agent_id
-        );
-
+        debug!("Agent: {} - Build Pipeline Runner", agent_id);
 
         let agent_config = self.find_agent_config(agent_id).await?;
 
@@ -243,7 +239,6 @@ impl AgentService {
         preset: Option<Preset>,
         visited: &mut HashSet<String>,
     ) -> Result<AgentHandle> {
-
         let config = self.find_agent_config(agent_id).await?;
 
         debug!(
@@ -286,13 +281,17 @@ impl AgentService {
     ///
     /// Returns an error if the provider is not registered, the required API key is missing,
     /// or a local provider has no `base_url` configured.
-    pub fn resolve_provider(&self,agent_id: &str, id: &str, model: Option<&str>) -> anyhow::Result<Provider> {
+    pub fn resolve_provider(
+        &self,
+        agent_id: &str,
+        id: &str,
+        model: Option<&str>,
+    ) -> anyhow::Result<Provider> {
         debug!(
             llm= %id,
             model= ?model,
            "Agent: {} - Resolve Provider", agent_id
         );
-
 
         let provider = self
             .provider_registry

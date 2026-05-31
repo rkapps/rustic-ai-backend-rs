@@ -7,12 +7,11 @@ pub type CensusRawResponse = Vec<Vec<String>>;
 /// Parsed Census record
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CensusRecord {
-    pub variable: String,      // ← add this "B19013_001E"
+    pub variable: String, // ← add this "B19013_001E"
     pub value: String,
-    pub geo_fips: String,     // was geo_id
-    pub geo_name: String,     // was name
+    pub geo_fips: String, // was geo_id
+    pub geo_name: String, // was name
     pub geo_type: Option<String>,
-
 }
 
 /// Census variable metadata

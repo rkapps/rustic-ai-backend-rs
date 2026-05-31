@@ -17,8 +17,8 @@ use crate::{
 /// Walks `messages` from the end and collects consecutive `Assistant` entries
 /// (stopping at the first non-`Assistant` message). The collected content is joined
 /// with double newlines and returned as the merged pipeline stage output.
-pub fn build_merged_sub_agent_message(messages: &mut Vec<Message>) -> String {
-    let merged = messages
+pub fn build_merged_sub_agent_message(messages: &mut [Message]) -> String {
+    messages
         .iter()
         .rev()
         .take_while(|m| matches!(m, Message::Assistant { .. }))
@@ -30,8 +30,8 @@ pub fn build_merged_sub_agent_message(messages: &mut Vec<Message>) -> String {
             _ => None,
         })
         .collect::<Vec<_>>()
-        .join("\n\n");
-    merged
+        .join("\n\n")
+
 }
 
 /// Append a labelled `Assistant` message to `messages` from a sub-agent's [`CompletionResponse`].
@@ -47,7 +47,8 @@ pub fn build_sub_agent_messages(messages: &mut Vec<Message>, response: &Completi
         let content = serde_json::json!({
             "agent": sub_response.agent_id,
             "content": content_value  // embedded as value not string
-        }).to_string();
+        })
+        .to_string();
 
         messages.push(Message::Assistant {
             content,
@@ -90,7 +91,6 @@ pub fn unwrap_agent_content(content: &str) -> String {
     }
 }
 
-
 /// Strip markdown code fences (` ```json ` or ` ``` `) from LLM output.
 ///
 /// Many models wrap JSON responses in fences even when instructed not to; this normalises
@@ -124,16 +124,16 @@ pub fn build_stage_decision(response: CompletionResponse) -> HttpResult<StageDec
         let clean = &build_clean_json(val);
 
         match serde_json::from_str::<StageDecision>(clean) {
-            Ok(decision) => return Ok(decision),
+            Ok(decision) => Ok(decision),
             Err(e) => Err(HttpError::Other(format!(
                 "Failed to parse StageDecision: {}",
                 e
             ))),
         }
     } else {
-        return Err(HttpError::Other(
+        Err(HttpError::Other(
             "Failed to parse completion response".to_string(),
-        ));
+        ))
     }
 }
 

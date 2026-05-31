@@ -38,7 +38,7 @@ impl BeaClient {
         let url = format!(
             "{}?UserID={}&method=GetParameterValues&datasetname=Regional&ParameterName=GeoFips&ResultFormat=JSON",
             BEA_BASE_URL, self.api_key
-       );
+        );
         info!("Geofips Url: {}", url);
         let response: BeaResponse = self.http_client.get_request(url, None).await?;
         if let Some(error) = response.bea_api.error {

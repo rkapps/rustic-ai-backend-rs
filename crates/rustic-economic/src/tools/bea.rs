@@ -1,4 +1,4 @@
-use crate::{helper::geo_type, service::EconomicDataService};
+use crate::service::EconomicDataService;
 use anyhow::Result;
 use async_trait::async_trait;
 use rustic_core::Tool;

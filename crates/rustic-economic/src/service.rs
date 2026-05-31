@@ -1,6 +1,6 @@
 use anyhow::Result;
 use chrono::{Duration, Utc};
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 use tracing::{error, info};
 
 use rustic_providers::{
@@ -70,7 +70,7 @@ impl EconomicDataService {
     ) -> Result<Vec<DataPoint>> {
         let stored = self.storage.get_series(series_id).await?;
         if stored.is_none() {
-            return Ok(Vec::new())
+            return Ok(Vec::new());
         }
         let stored = stored.unwrap();
 
@@ -211,7 +211,7 @@ impl EconomicDataService {
             series_id: series_id.to_string(),
             source: EconomicSource::Fred,
             name: name.to_string(),
-            frequency: Frequency::from_str(frequency),
+            frequency: Frequency::from_str(frequency)?,
             category: category.to_string(),
             sectors: sectors.to_vec(),
             active: true,
@@ -247,20 +247,20 @@ impl EconomicDataService {
             );
 
             let new_record = BeaNipaData {
-                    id,
-                    table_name: row.table_name.clone(),
-                    series_code: row.series_code.clone(),
-                    line_number: row.line_number.clone(),
-                    line_description: row.line_description.clone(),
-                    time_period: row.time_period.clone(),
-                    metric_name: row.metric_name.clone(),
-                    cl_unit: row.cl_unit.clone(),
-                    unit_mult: row.unit_mult.clone(),
-                    data_value: row.data_value.clone(),
-                    last_refreshed: Utc::now(),
-                    next_refresh: Self::next_refresh("m"),
-                };
-            all_records.push(new_record);                
+                id,
+                table_name: row.table_name.clone(),
+                series_code: row.series_code.clone(),
+                line_number: row.line_number.clone(),
+                line_description: row.line_description.clone(),
+                time_period: row.time_period.clone(),
+                metric_name: row.metric_name.clone(),
+                cl_unit: row.cl_unit.clone(),
+                unit_mult: row.unit_mult.clone(),
+                data_value: row.data_value.clone(),
+                last_refreshed: Utc::now(),
+                next_refresh: Self::next_refresh("m"),
+            };
+            all_records.push(new_record);
         }
         match self.storage.upsert_bea_nipa_bulk(all_records).await {
             Ok(c) => c,
@@ -275,13 +275,10 @@ impl EconomicDataService {
         geo_fips: &[BeaParamValue],
         years: &[&str],
     ) -> Result<()> {
-
         // loop through the years
         for year in years {
-
             // loop through the tables
             for table in &tables {
-
                 let mut all_rows = Vec::new();
 
                 // loop through the geo-fips
@@ -293,7 +290,13 @@ impl EconomicDataService {
                     {
                         Ok(c) => c,
                         Err(e) => {
-                            tracing::warn!("BEA Regional for year: {} table: {} geo_flip {:?} failed: {}", year, table.0, geo_fip.key, e);
+                            tracing::warn!(
+                                "BEA Regional for year: {} table: {} geo_flip {:?} failed: {}",
+                                year,
+                                table.0,
+                                geo_fip.key,
+                                e
+                            );
                             tokio::time::sleep(tokio::time::Duration::from_millis(10000)).await;
 
                             match self
@@ -303,7 +306,13 @@ impl EconomicDataService {
                             {
                                 Ok(c) => c,
                                 Err(e) => {
-                                    tracing::warn!("BEA Regional for year: {} table: {} geo_flip {:?} failed: {}", year, table.0, geo_fip.key, e);
+                                    tracing::warn!(
+                                        "BEA Regional for year: {} table: {} geo_flip {:?} failed: {}",
+                                        year,
+                                        table.0,
+                                        geo_fip.key,
+                                        e
+                                    );
                                     Vec::new()
                                 }
                             }
@@ -331,28 +340,28 @@ impl EconomicDataService {
                         all_rows.push(new_row);
                     }
 
-                    if i%20 == 0 {
+                    if i % 20 == 0 {
                         info!("i: {} geo_fip: {}", i, geo_fip.key);
                         tokio::time::sleep(tokio::time::Duration::from_millis(10000)).await;
                     }
                 }
 
-                info!("all records for year: {} table: {} - {}", year, table.0, all_rows.len());
+                info!(
+                    "all records for year: {} table: {} - {}",
+                    year,
+                    table.0,
+                    all_rows.len()
+                );
 
                 match self.storage.upsert_bea_regional_bulk(all_rows).await {
                     Ok(c) => c,
                     Err(e) => error!("Update census_bulk error: {}", e),
                 };
-    
-
             }
-
-
         }
 
         Ok(())
     }
-
 
     pub async fn update_census(
         &self,
@@ -410,7 +419,7 @@ impl EconomicDataService {
                         year: year.to_string(),
                         variable: record.variable.clone(),
                         value: record.value.clone(),
-                        geo_name: geo_name,
+                        geo_name,
                         geo_fips: geo_fip.key.clone(),
                         geo_type: record.geo_type.clone(),
                         last_refreshed: Utc::now(),

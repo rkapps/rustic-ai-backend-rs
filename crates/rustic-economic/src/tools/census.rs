@@ -53,31 +53,31 @@ impl Tool for CensusDataTool {
 
     fn parameters(&self) -> Value {
         json!({
-                    "type": "object",
-                    "properties": {
-                        "year": {
-                            "type": "string",
-                            "description": "Data year. Use 2023 (latest available).",
-                            "default": "2023"
-                        },
-                        "dataset": {
-                            "type": "string",
-                            "enum": ["acs1", "acs5"],
-                            "description": "acs1=1-year estimates, acs5=5-year estimates (includes rural areas)"
-                        },
-                        "variables": {
-                            "type": "array",
-                            "items": { "type": "string" },
-                            "description": "ACS variable codes e.g. B19013_001E (median income), B01003_001E (population)"
-                        },
-                        "geo_fips": {
-                            "type": "string",
-                            "description": "Filter by specific geo. States: 04000=Arizona, 48000=Texas, 06000=California
-                                    Counties: 04013=Maricopa AZ, 48453=Travis TX. Omit to return all available geos."
-                        }
-                    },
-                    "required": ["year", "dataset", "variables"]
-                })
+            "type": "object",
+            "properties": {
+                "year": {
+                    "type": "string",
+                    "description": "Data year. Use 2023 (latest available).",
+                    "default": "2023"
+                },
+                "dataset": {
+                    "type": "string",
+                    "enum": ["acs1", "acs5"],
+                    "description": "acs1=1-year estimates, acs5=5-year estimates (includes rural areas)"
+                },
+                "variables": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "ACS variable codes e.g. B19013_001E (median income), B01003_001E (population)"
+                },
+                "geo_fips": {
+                    "type": "string",
+                    "description": "Filter by specific geo. States: 04000=Arizona, 48000=Texas, 06000=California
+                            Counties: 04013=Maricopa AZ, 48453=Travis TX. Omit to return all available geos."
+                }
+            },
+            "required": ["year", "dataset", "variables"]
+        })
     }
 
     async fn execute(&self, params: Value) -> Result<Value> {

@@ -66,7 +66,6 @@ pub struct BeaRegionalRow {
     pub unit_mult: String,
 }
 
-
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct BeaParamValue {
     #[serde(rename = "Key")]
@@ -74,7 +73,6 @@ pub struct BeaParamValue {
     #[serde(rename = "Desc")]
     pub description: String,
 }
-
 
 #[derive(Debug, Deserialize)]
 pub struct BeaError {

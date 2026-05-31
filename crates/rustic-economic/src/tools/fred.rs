@@ -53,10 +53,7 @@ impl Tool for FredSeriesTool {
 
         let limit = params["limit"].as_u64().map(|n| n as usize);
 
-        let data_points = self
-            .service
-            .get_fred_series(series_id, limit)
-            .await?;
+        let data_points = self.service.get_fred_series(series_id, limit).await?;
 
         Ok(json!({
             "series_id": series_id,

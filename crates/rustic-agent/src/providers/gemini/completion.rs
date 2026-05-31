@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use eventsource_stream::Eventsource;
 use futures::StreamExt;
 use reqwest::header::HeaderValue;
-use rustic_core::{HttpError,HttpClient, HttpResult};
+use rustic_core::{HttpClient, HttpError, HttpResult};
 use tracing::{debug, error, trace};
 
 use crate::{

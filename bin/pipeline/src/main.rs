@@ -2,16 +2,16 @@ use std::{env, sync::Arc};
 
 use anyhow::Result;
 use rustic_core::set_logger;
-use rustic_economic::{pipeline::EconomicDataPipeline, service::EconomicDataService, storage::EconomicStorageManager};
+use rustic_economic::{
+    pipeline::EconomicDataPipeline, service::EconomicDataService, storage::EconomicStorageManager,
+};
 use rustic_providers::{BeaClient, CensusClient, FredClient};
 
 #[tokio::main]
 
 async fn main() -> Result<()> {
-
-    let filter = std::env::var("RUST_LOG").unwrap_or_else(|_| {
-        "rustic_core=info,rustic_economic=info".to_string()
-    });
+    let filter = std::env::var("RUST_LOG")
+        .unwrap_or_else(|_| "rustic_core=info,rustic_economic=info".to_string());
 
     set_logger(filter);
     // Find these again for rusticai
@@ -35,7 +35,7 @@ async fn main() -> Result<()> {
         bea_client,
         census_client,
     );
-    let pipeline = EconomicDataPipeline::new(Arc::new(economic_data_service)); 
+    let pipeline = EconomicDataPipeline::new(Arc::new(economic_data_service));
     // let _ = pipeline.clean().await;
     let _ = pipeline.run().await;
 
