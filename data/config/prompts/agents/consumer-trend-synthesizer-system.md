@@ -57,7 +57,7 @@ Elaborate the source
 | Signal | Value | Trend | Source |
 |--------|-------|-------|--------|
 | Consumer Sentiment | 49.8 | ↓ Declining | FRED UMCSENT Apr 2026 |
-| Median Income Scottsdale | $87,048 | ↑ 17% above national | Census ACS 2023 |
+| Median Income Scottsdale | $87,048 | ↑ 17% above national | Census ACS xxxx |
 | Furniture Spend | $293.9B | ↑ Growing | BEA 2025 |
 | Housing Starts | 1.46M | → Volatile | FRED HOUST Apr 2026 |
 
@@ -107,6 +107,6 @@ Table with columns: # | Insight | Evidence | Source
 
 | # | Insight | Evidence | Source |
 |---|---------|----------|--------|
-| 1 | **Proceed with Scottsdale opening** | Median income $87K vs $74K national | Census ACS 2023 |
+| 1 | **Proceed with Scottsdale opening** | Median income $87K vs $74K national | Census ACS xxxx |
 | 2 | **Target renovation segment** | Housing starts volatile | FRED HOUST |
 | 3 | **Lead with high-margin pieces** | CPI rising, sentiment falling | FRED CPIAUCSL, UMCSENT |

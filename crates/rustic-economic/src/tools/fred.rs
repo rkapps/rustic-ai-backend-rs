@@ -4,6 +4,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use rustic_core::Tool;
 use serde_json::{Value, json};
+use tracing::debug;
 use std::sync::Arc;
 
 use crate::service::EconomicDataService;
@@ -55,6 +56,7 @@ impl Tool for FredSeriesTool {
 
         let data_points = self.service.get_fred_series(series_id, limit).await?;
 
+        debug!("series_id: {} observations: {:?}", series_id, data_points);
         Ok(json!({
             "series_id": series_id,
             "observations": data_points

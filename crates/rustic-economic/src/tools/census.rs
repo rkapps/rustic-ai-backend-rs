@@ -74,6 +74,15 @@ impl Tool for CensusDataTool {
                     "type": "string",
                     "description": "Filter by specific geo. States: 04000=Arizona, 48000=Texas, 06000=California
                             Counties: 04013=Maricopa AZ, 48453=Travis TX. Omit to return all available geos."
+                },
+                "geo_type": {
+                    "type": "string",
+                    "enum": ["state", "county"],
+                    "description": "Filter by geography type"
+                },
+                "state_prefix": {
+                    "type": "string",
+                    "description": "2-digit state code for all counties in a state. 06=California, 48=Texas, 04=Arizona"
                 }
             },
             "required": ["year", "dataset", "variables"]
@@ -90,11 +99,13 @@ impl Tool for CensusDataTool {
 
         let dataset = params["dataset"].as_str().unwrap_or("acs5");
         let year = params["year"].as_str().unwrap_or("LAST5");
-        let geo_fips = params["geo_fips"].as_str().unwrap_or("STATE");
+        let geo_fips = params["geo_fips"].as_str();
+        let geo_type = params["geo_type"].as_str();
+        let state_prefix = params["state_prefix"].as_str();
 
         let records = self
             .service
-            .get_census_data(&variables, dataset, year, geo_fips)
+            .get_census_data(&variables, dataset, geo_fips, geo_type, state_prefix, year)
             .await?;
 
         // census

@@ -9,6 +9,7 @@ use rustic_storage::{
     MongoDatabase, Repository, SearchCriteria, mongo::repository::MongoRepository,
 };
 use tokio::sync::Mutex;
+use tracing::debug;
 
 #[derive(Debug)]
 pub struct EconomicStorageManager {
@@ -202,8 +203,10 @@ impl EconomicStorageManager {
             return Err(anyhow::anyhow!("Error getting BeaRegional Repository"));
         };
         let mut repo = repo.lock().await;
+
+        // use contains till the table name feld is added. code has tablename + linecode
         let mut criteria = SearchCriteria::new()
-            .eq("code", table_name)
+            .contains("code", table_name)
             .eq("time_period", year);
 
         if let Some(fips) = geo_fips {
@@ -215,7 +218,7 @@ impl EconomicStorageManager {
         if let Some(prefix) = state_prefix {
             criteria = criteria.starts_with("geo_fips", prefix);
         }
-
+        debug!("get_bea_regional_filtered SearchCriteria: {:#?}", criteria);
         repo.find(Some(criteria)).await
     }
 
@@ -253,20 +256,274 @@ impl EconomicStorageManager {
         repo.update(data).await
     }
 
-    pub async fn get_census_by_variable(
+    pub async fn get_census_filtered(
         &self,
         dataset: &str,
-        year: &str,
         variable: &str,
+        geo_fips: Option<&str>,
+        geo_type: Option<&str>,
+        state_prefix: Option<&str>,
+        year: &str,
     ) -> Result<Vec<CensusData>> {
         let Ok(repo) = self.census().await else {
             return Err(anyhow::anyhow!("Error getting Census Repository"));
         };
         let mut repo = repo.lock().await;
-        let criteria = SearchCriteria::new()
+        let mut criteria = SearchCriteria::new()
             .eq("dataset", dataset)
             .eq("year", year)
             .eq("variable", variable);
+
+        if let Some(fips) = geo_fips {
+            criteria = criteria.eq("geo_fips", fips);
+        }
+        if let Some(gt) = geo_type {
+            criteria = criteria.eq("geo_type", gt);
+        }
+        if let Some(prefix) = state_prefix {
+            criteria = criteria.starts_with("geo_fips", prefix);
+        }
+        debug!("get_census_filtered SearchCriteria: {:#?}", criteria);
+
         repo.find(Some(criteria)).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+
+    use super::*;
+
+    async fn storage_manager() -> Result<EconomicStorageManager> {
+        // Find these again for rusticai
+        let mongo_db =
+            env::var("RUSTIC_AI_DB_NAME").expect("RUSTIC_AI_DB_NAME envrionment variable not set");
+        let mongo_uri = env::var("MONGO_URI").expect("MONGO_URI envrionment variable not set");
+
+        EconomicStorageManager::new(&mongo_uri, &mongo_db).await
+    }
+
+    #[tokio::test]
+    async fn test_get_bea_regional_by_state_prefix() -> Result<()> {
+        let manager = storage_manager().await?;
+
+        // query all CA counties
+        let rows = manager
+            .get_bea_regional_filtered("CAINC1", None, Some("county"), Some("06"), "2024")
+            .await
+            .unwrap();
+
+        println!("Rows: {}", rows.len());
+        assert!(!rows.is_empty(), "Should return CA county rows");
+
+        // verify geo_fips starts with 06
+        for row in &rows {
+            assert!(
+                row.geo_fips.starts_with("06"),
+                "geo_fips should start with 06, got {}",
+                row.geo_fips
+            );
+            assert_eq!(row.geo_type, "county");
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_bea_regional_by_geo_fips() -> Result<()> {
+        let manager = storage_manager().await?;
+
+        // query Sacramento County directly
+        let rows = manager
+            .get_bea_regional_filtered("CAINC1", Some("06067"), None, None, "2024")
+            .await
+            .unwrap();
+
+        println!("Rows: {}", rows.len());
+        assert!(!rows.is_empty(), "Should return Sacramento County row");
+        assert_eq!(rows[0].geo_fips, "06067");
+        assert_eq!(rows[0].geo_name, "Sacramento");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_bea_regional_by_geo_type_state() -> Result<()> {
+        let manager = storage_manager().await?;
+
+        let rows = manager
+            .get_bea_regional_filtered("CAINC1", None, Some("state"), None, "2024")
+            .await
+            .unwrap();
+
+        println!("State rows: {}", rows.len());
+        assert!(!rows.is_empty(), "Should return state rows");
+        for row in &rows {
+            assert_eq!(row.geo_type, "state");
+            assert!(
+                row.geo_fips.ends_with("000"),
+                "State FIPS should end with 000, got {}",
+                row.geo_fips
+            );
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_bea_regional_multiple_years() -> Result<()> {
+        let manager = storage_manager().await?;
+
+        let rows = manager
+            .get_bea_regional_filtered("CAINC1", Some("48000"), None, None, "2024")
+            .await
+            .unwrap();
+
+        println!("Texas rows: {}", rows.len());
+        assert!(!rows.is_empty(), "Should return Texas rows");
+        assert_eq!(rows[0].geo_fips, "48000");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_bea_regional_by_region() -> Result<()> {
+        let manager = storage_manager().await?;
+
+        let rows = manager
+            .get_bea_regional_filtered("CAINC1", None, Some("region"), None, "2024")
+            .await
+            .unwrap();
+
+        println!("Region rows: {}", rows.len());
+        assert!(!rows.is_empty(), "Should return region rows");
+        for row in &rows {
+            assert_eq!(row.geo_type, "region");
+        }
+        Ok(())
+    }
+
+    // ── Census ────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_census_by_variable() -> Result<()> {
+        let manager = storage_manager().await?;
+
+        let records = manager
+            .get_census_filtered("acs5", "B19013_001E", None, None, None, "2024")
+            .await
+            .unwrap();
+
+        println!("Census median income records: {}", records.len());
+        assert!(!records.is_empty(), "Should return median income records");
+        for record in &records {
+            assert_eq!(record.variable, "B19013_001E");
+            assert!(!record.value.is_empty());
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_census_by_geo_fips() -> Result<()> {
+        let manager = storage_manager().await?;
+
+        let records = manager
+            .get_census_filtered("acs5", "B19013_001E", Some("06075"), None, None, "2024")
+            .await
+            .unwrap();
+
+        println!("SF Census records: {}", records.len());
+        assert!(!records.is_empty(), "Should return San Francisco record");
+        assert_eq!(records[0].geo_fips, "06075");
+        assert_eq!(records[0].geo_name, "San Francisco");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_census_by_state_prefix() -> Result<()> {
+        let manager = storage_manager().await?;
+
+        let records = manager
+            .get_census_filtered(
+                "acs5",
+                "B19013_001E",
+                None,
+                Some("county"),
+                Some("06"),
+                "2024",
+            )
+            .await
+            .unwrap();
+
+        println!("CA county census records: {}", records.len());
+        assert!(!records.is_empty(), "Should return CA county records");
+        for record in &records {
+            assert!(record.geo_fips.starts_with("06"), "got {}", record.geo_fips);
+            assert_eq!(record.geo_type, Some("county".to_string()));
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_census_by_geo_type_state() -> Result<()> {
+        let manager = storage_manager().await?;
+
+        let records = manager
+            .get_census_filtered("acs5", "B19013_001E", None, Some("state"), None, "2024")
+            .await
+            .unwrap();
+
+        println!("State census records: {}", records.len());
+        assert!(!records.is_empty());
+        assert!(
+            records.len() >= 50,
+            "Should have at least 50 states, got {}",
+            records.len()
+        );
+        for record in &records {
+            assert_eq!(record.geo_type, Some("state".to_string()));
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_census_maricopa_multiple_variables() -> Result<()> {
+        let manager = storage_manager().await?;
+        let variables = vec!["B19013_001E", "B25077_001E", "B01003_001E"];
+        let mut all_records = Vec::new();
+
+        for variable in &variables {
+            let records = manager
+                .get_census_filtered("acs5", variable, Some("04013"), None, None, "2024")
+                .await
+                .unwrap();
+            all_records.extend(records);
+        }
+
+        println!("Maricopa multi-variable records: {}", all_records.len());
+        assert_eq!(
+            all_records.len(),
+            3,
+            "Should return one record per variable"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_census_national() -> Result<()> {
+        let manager = storage_manager().await?;
+
+        let records = manager
+            .get_census_filtered("acs5", "B19013_001E", Some("00000"), None, None, "2024")
+            .await
+            .unwrap();
+
+        println!("National census records: {}", records.len());
+        assert!(!records.is_empty(), "Should return national record");
+        assert_eq!(records[0].geo_fips, "00000");
+        Ok(())
     }
 }

@@ -25,7 +25,13 @@ Build agents list using ONLY this table:
 
 ## Step 3 — Run synthesizer
 
-Respond with raw JSON only. No markdown. No code fences. No explanation:
+Respond with raw JSON only. 
+You respond with ONLY a single JSON object. Nothing else.
+No markdown. No code fences. No pipeline execution. No synthesis.
+You are a router only — you decide which agents to run next.
+
+NEVER produce analysis, tables, or reports.
+NEVER run the pipeline yourself.
 
 ```json
 { "agents": ["consumer-trend-synthesizer"], "execution": "sequential", "stop": true }

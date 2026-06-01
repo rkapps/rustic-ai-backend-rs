@@ -47,7 +47,7 @@ impl EconomicDataService {
     }
 
     // ── CLEAN ──────────────────────────────────────────────────────────────
-    pub async fn clean_fred_series(&self) -> Result<()> {
+    pub async fn clean_fred(&self) -> Result<()> {
         self.storage.delete_all_fred_series().await
     }
 
@@ -134,14 +134,6 @@ impl EconomicDataService {
             result.extend(stored);
         }
 
-        // if result.is_empty() {
-        //     return Err(anyhow::anyhow!(
-        //         "BEA Regional {} {} not found — run pipeline first",
-        //         table_name,
-        //         year
-        //     ));
-        // }
-
         Ok(result)
     }
 
@@ -149,21 +141,13 @@ impl EconomicDataService {
         &self,
         variables: &[&str],
         dataset: &str,
+        geo_fips: Option<&str>,
+        geo_type: Option<&str>,
+        state_prefix: Option<&str>,
         year: &str,
-        geo_fips: &str,
     ) -> Result<Vec<CensusData>> {
         // expand LAST5 to actual years
-        let years: Vec<String> = if year == "LAST5" {
-            vec![
-                "2025".to_string(),
-                "2024".to_string(),
-                "2023".to_string(),
-                "2022".to_string(),
-                "2021".to_string(),
-            ]
-        } else {
-            year.split(',').map(|y| y.trim().to_string()).collect()
-        };
+        let years = resolve_years(year);
 
         let mut result = Vec::new();
 
@@ -171,20 +155,12 @@ impl EconomicDataService {
             for variable in variables {
                 let stored = self
                     .storage
-                    .get_census_by_variable(dataset, y, variable)
+                    .get_census_filtered(dataset,  variable,
+                        geo_fips, geo_type, state_prefix, y
+                        )
                     .await?;
 
-                // filter by geo_fips
-                let filtered = if geo_fips == "STATE" {
-                    stored
-                } else {
-                    stored
-                        .into_iter()
-                        .filter(|r| r.geo_fips == geo_fips)
-                        .collect()
-                };
-
-                result.extend(filtered);
+                result.extend(stored);
             }
         }
         Ok(result)

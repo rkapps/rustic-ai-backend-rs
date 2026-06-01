@@ -13,37 +13,51 @@ impl EconomicDataPipeline {
         Self { service }
     }
 
-    pub async fn clean(&self) -> Result<()> {
-        // self.service.clean_bea().await?;
-        self.service.clean_census().await?;
-        // self.service.clean_fred_series().await?;
+    pub async fn run_fred(&self, clean: bool) -> Result<()> {
+        info!("Economic Data Fred Pipeline started...");
+        if clean {
+            self.service.clean_fred().await?;
+        }
+        if let Err(e) = self.update_fred().await {
+            tracing::error!("FRED pipeline failed: {}", e);
+        } else {
+            tracing::info!("FRED pipeline complete");
+        }
         Ok(())
     }
 
-    pub async fn run(&self) -> Result<()> {
-        info!("Economic Data Pipeline started...");
-        // tokio::try_join!(self.run_fred(), self.run_bea(), self.run_census(),)?;
-        // tokio::try_join!(self.run_bea())?;
+    pub async fn run_bea(&self, clean: bool) -> Result<()> {
+        info!("Economic Data Bea Pipeline started...");
 
-        // self.service.clean_bea().await?;
-        // if let Err(e) = self.run_bea().await {
-        //     tracing::error!("BEA pipeline failed: {}", e);
-        // } else {
-        //     tracing::info!("BEA pipeline complete");
-        // }
+        if clean {
+            self.service.clean_bea().await?;
+        }
+        if let Err(e) = self.update_bea().await {
+            tracing::error!("BEA pipeline failed: {}", e);
+        } else {
+            tracing::info!("BEA pipeline complete");
+        }
 
-        // self.service.clean_census().await?;
-        if let Err(e) = self.run_census().await {
+        Ok(())
+    }
+
+    pub async fn run_census(&self, clean: bool) -> Result<()> {
+        info!("Economic Data Census Pipeline started...");
+
+        if clean {
+            self.service.clean_census().await?;
+        }
+
+        if let Err(e) = self.update_census().await {
             tracing::error!("Census pipeline failed: {}", e);
         } else {
             tracing::info!("Census pipeline complete");
         }
 
-        info!("Economic Data Pipeline done");
         Ok(())
     }
 
-    async fn run_fred(&self) -> Result<()> {
+    async fn update_fred(&self) -> Result<()> {
         let series = vec![
             // (series_id, frequency, limit, name, category, sectors)
             (
@@ -159,7 +173,7 @@ impl EconomicDataPipeline {
         Ok(())
     }
 
-    async fn run_bea(&self) -> Result<()> {
+    async fn update_bea(&self) -> Result<()> {
         // let years = "2026,2025,2024,2023,2022,2021,2020";
         let years = vec!["2024"];
 
@@ -187,7 +201,7 @@ impl EconomicDataPipeline {
         Ok(())
     }
 
-    async fn run_census(&self) -> Result<()> {
+    async fn update_census(&self) -> Result<()> {
         let variables = [
             // "B19013_001E", // median income
             "B01002_001E", // median age

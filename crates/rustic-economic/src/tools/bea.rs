@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use rustic_core::Tool;
 use serde_json::{Value, json};
 use std::sync::Arc;
-use tracing::info;
+use tracing::{debug, info};
 
 #[derive(Debug)]
 pub struct BeaDataTool {
@@ -124,10 +124,17 @@ impl Tool for BeaDataTool {
                 let geo_type = params["geo_type"].as_str();
                 let state_prefix = params["state_prefix"].as_str();
 
+
                 let rows = self
                     .service
                     .get_bea_regional(table_name, geo_fips, geo_type, state_prefix, year)
                     .await?;
+
+                    debug!(
+                        "bea regional table_name: {} geo_fips: {:?} geo_type: {:?} state_prefix: {:?} year: {} - rows: {}",
+                        table_name, geo_fips, geo_type, state_prefix, year, rows.len()
+                    );
+    
                 Ok(json!({
                     "dataset":    dataset,
                     "table_name": table_name,
