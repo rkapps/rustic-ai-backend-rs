@@ -1,6 +1,7 @@
 use std::{env, sync::Arc};
 
 use anyhow::Result;
+use bset_backend::{BsetTools, service::BsetDataService};
 use fin_analyse::tools::{
     TickerIndicatorTool, TickerPeersTool, TickerPriceHistoryTool, TickerScreeningTool,
     TickerSentimentTool, TickerSnapshotTool, TickerTaxonomyTool,
@@ -72,7 +73,7 @@ async fn main() -> Result<()> {
         census_client,
     );
 
-    let tools: Vec<Arc<dyn Tool>> = vec![
+    let mut tools: Vec<Arc<dyn Tool>> = vec![
         Arc::new(TickerScreeningTool::new(
             storage_service.clone(),
             embedding_client.clone(),
@@ -90,6 +91,17 @@ async fn main() -> Result<()> {
         Arc::new(CensusDataTool::new(Arc::new(economic_data_service.clone()))),
         Arc::new(BeaDataTool::new(Arc::new(economic_data_service.clone()))),
     ];
+
+    //bset specific
+    let bset_data_path = env::var("RUSTIC_AI_BSET_DATA_PATH")
+        .expect("RUSTIC_AI_BSET_DATA_PATH environment variable is not set.");
+
+    let bset_data_service = BsetDataService::new()
+        .add_file(&bset_data_path, "bset_q2_2025.xlsx", 2025, 2)?
+        .add_file(&bset_data_path, "bset_q2_2026.xlsx", 2026, 2)?;
+
+    let bset_tools = BsetTools::new(bset_data_service);
+    tools.extend(bset_tools.tools());
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
     let addr = format!("0.0.0.0:{}", port);
