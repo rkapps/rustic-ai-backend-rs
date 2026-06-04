@@ -35,3 +35,6 @@ rustic-economic.workspace = true
 fin-analyse.workspace = true
 fin-storage.workspace = true
 
+
+# for bset
+bset-backend = { git = "https://github.com/rkapps/bset-backend.git ",  branch = "main"}

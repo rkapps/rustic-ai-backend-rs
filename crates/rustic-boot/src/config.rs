@@ -1,15 +1,10 @@
-use std::{io::Write, path::PathBuf};
 
 use anyhow::{Context, Result};
-use google_cloud_storage::{
-    client::{Client, ClientConfig},
-    http::objects::{download::Range, get::GetObjectRequest},
-};
 use rustic_agent::services::config::{
     agent::AgentConfig, mcp::MCPServerConfig, provider::ProviderConfig,
 };
+use rustic_core::load_content;
 use serde::{Deserialize, Serialize};
-use tempfile::NamedTempFile;
 use tracing::trace;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -84,52 +79,4 @@ pub async fn load_chat_templates(chat_templates_path: String) -> Result<Vec<Chat
     trace!("load_chat_templates: {}", chat_templates_content);
     let template_file: TemplatesFile = serde_json::from_str(&chat_templates_content)?;
     Ok(template_file.templates)
-}
-
-pub async fn load_content(path: String) -> Result<String> {
-    let content = if path.starts_with("gs://") {
-        download_gcs_string(&path).await?
-    } else {
-        std::fs::read_to_string(&path)?
-    };
-    Ok(content)
-}
-
-pub async fn download_gcs_bytes(gcs_path: &str) -> anyhow::Result<Vec<u8>> {
-    let path = gcs_path
-        .strip_prefix("gs://")
-        .ok_or_else(|| anyhow::anyhow!("Invalid GCS path: {}", gcs_path))?;
-    let (bucket, object) = path
-        .split_once('/')
-        .ok_or_else(|| anyhow::anyhow!("Invalid GCS path: {}", gcs_path))?;
-
-    let config = ClientConfig::default().with_auth().await?;
-    let client = Client::new(config);
-
-    let data = client
-        .download_object(
-            &GetObjectRequest {
-                bucket: bucket.to_string(),
-                object: object.to_string(),
-                ..Default::default()
-            },
-            &Range::default(),
-        )
-        .await?;
-
-    Ok(data)
-}
-
-// for files that need a temp path (xlsx, models)
-pub async fn download_gcs_to_file(gcs_path: &str) -> anyhow::Result<PathBuf> {
-    let data = download_gcs_bytes(gcs_path).await?;
-    let mut tmp = NamedTempFile::new()?;
-    tmp.write_all(&data)?;
-    Ok(tmp.into_temp_path().keep()?)
-}
-
-// for text content (config, json)
-pub async fn download_gcs_string(gcs_path: &str) -> anyhow::Result<String> {
-    let data = download_gcs_bytes(gcs_path).await?;
-    Ok(String::from_utf8(data)?)
 }

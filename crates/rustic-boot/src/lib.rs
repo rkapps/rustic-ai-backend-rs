@@ -33,8 +33,5 @@ pub use conversation::service::ConversationService;
 // Storage
 pub use storage::manager::BootStorageManager;
 
-// Config
-pub use config::load::ChatTemplate;
-
 // Auth
 pub use auth::firebase::{FirebaseClaims, FirebaseKeyCache, firebase_auth_middleware};

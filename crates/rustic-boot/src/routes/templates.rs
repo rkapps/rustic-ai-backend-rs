@@ -7,7 +7,7 @@ use axum::{
 };
 use reqwest::StatusCode;
 
-use crate::{boot::BootState, config::load::ChatTemplate};
+use crate::{boot::BootState, config::ChatTemplate};
 
 pub fn template_routes<S>() -> Router<S>
 where
