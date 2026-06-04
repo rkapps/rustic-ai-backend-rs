@@ -97,8 +97,8 @@ async fn main() -> Result<()> {
         .expect("RUSTIC_AI_BSET_DATA_PATH environment variable is not set.");
 
     let bset_data_service = BsetDataService::new()
-        .add_file(&bset_data_path, "bset_q2_2025.xlsx", 2025, 2)?
-        .add_file(&bset_data_path, "bset_q2_2026.xlsx", 2026, 2)?;
+        .add_file(&bset_data_path, "bset_q2_2025.xlsx", 2025, 2).await?
+        .add_file(&bset_data_path, "bset_q2_2026.xlsx", 2026, 2).await?;
 
     let bset_tools = BsetTools::new(bset_data_service);
     tools.extend(bset_tools.tools());
