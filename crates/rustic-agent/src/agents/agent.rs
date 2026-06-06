@@ -211,7 +211,7 @@ impl Agent {
                 }
 
                 info!(
-                    tool_calls= %tool_calls.len(), 
+                    tool_calls= %tool_calls.len(),
                     response_id= %response_id,
                     "Agent: {} - ", agent_id
                 );
@@ -286,13 +286,13 @@ impl Agent {
                         nmessages= ?nmessages.len(),
                         "Agent: {} - ", agent_id
                     );
-    
+
                     if agent.store && !response_id.is_empty() {
                         // keep only the original user message, clear tool calls/results from previous iteration
                         current_messages.retain(|m| matches!(m, Message::User { .. }));
                         // inject last response_id into the user message
                         if let Some(Message::User { content, .. }) = current_messages.first_mut() {
-                            let last_response_id =Some(response_id);
+                            let last_response_id = Some(response_id);
                             *current_messages.first_mut().unwrap() = Message::User {
                                 content: content.clone(),
                                 response_id: last_response_id, // ← inject response_id

@@ -105,7 +105,10 @@ pub struct CompletionChunkResponse {
     pub thought: String,
     /// Raw extended-thinking text as returned by the provider.
     pub thinking: String,
+    /// pipeline status — UI only, never stored in turns
+    pub status: String,      
     /// `true` on the last chunk of the stream.
+
     pub is_final: bool,
     /// Token usage populated on the final chunk; `None` for intermediate chunks.
     pub usage: Option<CompletionResponseTokenUsage>,
@@ -125,12 +128,9 @@ impl CompletionChunkResponse {
             id,
             model,
             response_id,
-            content: String::new(),
-            thought: String::new(),
-            thinking: String::new(),
             is_final: true,
             usage,
-            tool_call: None,
+            ..Default::default()
         }
     }
 
@@ -138,29 +138,29 @@ impl CompletionChunkResponse {
     pub fn content(id: String, content: String, thinking: String) -> CompletionChunkResponse {
         CompletionChunkResponse {
             id,
-            model: String::new(),
-            response_id: String::new(),
             content,
-            thought: String::new(),
             thinking,
             is_final: false,
-            usage: None,
-            tool_call: None,
+            ..Default::default()
         }
     }
+
 
     /// Build a chunk carrying an incremental chain-of-thought fragment.
     pub fn thought(id: String, thought: String) -> CompletionChunkResponse {
         CompletionChunkResponse {
             id,
-            model: String::new(),
-            response_id: String::new(),
-            content: String::new(),
             thought,
-            thinking: String::new(),
             is_final: false,
-            usage: None,
-            tool_call: None,
+            ..Default::default()
+        }
+    }
+
+
+    pub fn status(status: String) -> CompletionChunkResponse {
+        CompletionChunkResponse {
+            status,
+            ..Default::default()
         }
     }
 
@@ -177,18 +177,15 @@ impl CompletionChunkResponse {
     ) -> CompletionChunkResponse {
         CompletionChunkResponse {
             id,
-            model: String::new(),
-            response_id: String::new(),
-            content: String::new(),
-            thought: String::new(),
-            thinking: String::new(),
             is_final: false,
-            usage: None,
             tool_call: Some(ToolCallRequest {
                 id: tool_id.unwrap(),
                 name: name.unwrap(),
                 arguments: arguments.unwrap(),
             }),
+            ..Default::default()
         }
     }
+
+    
 }

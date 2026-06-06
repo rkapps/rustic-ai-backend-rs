@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cargo check *)"
+      "Bash(cargo check *)",
+      "Bash(git -C /media/raghu/data2/Workspace/Projects/rustic-ai-backend-rs diff HEAD crates/rustic-agent/src/services/agent.rs)",
+      "Bash(git -C /media/raghu/data2/Workspace/Projects/rustic-ai-backend-rs diff HEAD -- crates/rustic-agent/src/agents/agent.rs crates/rustic-agent/src/agents/helper.rs crates/rustic-agent/src/agents/mod.rs)",
+      "Bash(git -C /media/raghu/data2/Workspace/Projects/rustic-ai-backend-rs diff HEAD -- crates/rustic-agent/src/agents/domain.rs crates/rustic-agent/src/agents/runner.rs)"
     ]
   }
 }

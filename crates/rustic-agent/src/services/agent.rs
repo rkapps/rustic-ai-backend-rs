@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -8,26 +8,41 @@ use tracing::{debug, info, trace};
 use tokio::sync::RwLock;
 
 use crate::{
-    agents::{Agent, PipeLineRunner, pipeline_runner::AgentHandle},
+    Agent,
+    agents::{
+        domain::AgentInput,
+        runner::{PipeLineAgent, Runnable, SingleAgent},
+    },
     client::{llm::LlmClient, preset::Preset, provider::Provider},
     services::{
         builder::AgentBuilder,
-        config::agent::{AgentConfig, ConversationStrategy, ExecutionType},
+        config::agent::{
+            AgentConfig, CompletionStrategy, ExecutionType,
+        },
         registry::{agent::AgentRegistry, provider::ProviderRegistry},
     },
     tools::{mcp::MCPRegistry, tool::ToolRegistry},
 };
 
-/// Central service for constructing [`Agent`] instances at request time.
+/// Central service for constructing [`Agent`] and [`Runnable`] instances at request time.
 ///
 /// `AgentService` holds shared references to all registries and a cache of
 /// live [`LlmClient`] instances keyed by `"{provider}:{model}"`. Clients are
 /// created on first use and reused across subsequent builds, avoiding repeated
 /// initialisation overhead.
 ///
-/// Use [`builder`](Self::builder) for full control, or the higher-level
-/// [`build_chat_agent`](Self::build_chat_agent) and [`build_agent_for_id`](Self::build_agent_for_id)
-/// for the common cases.
+/// ## Building agents
+///
+/// | Goal | Method |
+/// |------|--------|
+/// | Ad-hoc chat agent (no registry entry) | [`build_chat_agent`](Self::build_chat_agent) |
+/// | Registered agent by ID | [`build_agent_for_id`](Self::build_agent_for_id) |
+/// | Runnable (handles both single and pipeline topologies) | [`build_runnable`](Self::build_runnable) |
+/// | Low-level builder | [`builder`](Self::builder) |
+///
+/// Pipeline topologies are built recursively by [`build_runnable_agent`](Self::build_runnable_agent),
+/// which detects cycles via a `visited` set and wraps leaf agents in [`SingleAgent`] and
+/// orchestrators in [`PipeLineAgent`].
 #[derive(Clone)]
 pub struct AgentService {
     /// Live LLM client cache keyed by `"{LLM}:{model}"`.
@@ -64,14 +79,16 @@ impl AgentService {
 
     /// Build a general-purpose chat agent for the given provider and model.
     ///
-    /// Uses `Preset::Balanced` for hosted providers and `Preset::Local` for
-    /// `Provider::Local`. The `system_prompt` defaults to an empty string if `None`.
+    /// Intended for ad-hoc conversations that do not correspond to a registered
+    /// [`AgentConfig`]. The agent is assigned no ID and no tools. Preset defaults
+    /// to [`Preset::Local`] for local providers and [`Preset::Balanced`] otherwise.
+    /// `system_prompt` defaults to an empty string when `None`.
     pub async fn build_chat_agent(
         &self,
         llm: &str,
         model: &str,
         system_prompt: &Option<String>,
-        strategy: &ConversationStrategy,
+        strategy: &CompletionStrategy,
     ) -> Result<Agent> {
         let provider = self.resolve_provider("", llm, Some(model))?;
 
@@ -102,18 +119,27 @@ impl AgentService {
         Ok(agent)
     }
 
-    /// Build an agent configured by a pre-registered [`AgentConfig`].
+    /// Build a single [`Agent`] from a registered [`AgentConfig`].
     ///
-    /// Looks up `agent_id` in the [`AgentRegistry`], filters the global tool registry
-    /// down to only the tools listed in the agent's config, then builds with the
-    /// agent's system prompt and preset. Returns an error if `agent_id` is not found.
+    /// Preset resolution order (first wins): caller-supplied `preset` → agent config →
+    /// parent agent config → provider default (`Local` or `Balanced`).
+    ///
+    /// Tool and MCP registries are filtered down to only the IDs listed in the agent's
+    /// config; tools not present in the global registry are silently skipped.
+    ///
+    /// `system_prompt` overrides the config's own prompt; pass `None` to fall back to
+    /// an empty string (the config prompt is not used automatically — callers should
+    /// supply it from the config when needed).
+    ///
+    /// Returns an error if `agent_id` is not registered or the provider cannot be resolved.
     pub async fn build_agent_for_id(
         &self,
         parent_agent_id: Option<String>,
         agent_id: &str,
         llm: &str,
         model: &str,
-        strategy: &ConversationStrategy,
+        system_prompt: Option<String>,
+        strategy: &CompletionStrategy,
         preset: Option<Preset>,
     ) -> Result<Agent> {
         let agent_config = self.find_agent_config(agent_id).await?;
@@ -175,6 +201,7 @@ impl AgentService {
 
         // info!("System Prompt: {}", agent_config.system_prompt);
         info!(
+            strategy= ?strategy,
             preset= ?dpreset,
             tools= ?tool_registry.get_tools().len(),
             // system_prompt= ?agent_config.system_prompt,
@@ -184,7 +211,7 @@ impl AgentService {
         let agent = self
             .builder(&agent_config.id)
             .with_strategy(strategy.clone())
-            .with_system_prompt(agent_config.system_prompt.clone())
+            .with_system_prompt(system_prompt.unwrap_or_default())
             .with_tools(tool_registry.get_tools())
             .with_filtered_mcp(mcp_registry)
             .with_preset(dpreset)
@@ -196,72 +223,44 @@ impl AgentService {
         Ok(agent)
     }
 
-    pub async fn build_pipeline_runner(
-        &self,
-        agent_id: &str,
-        llm: &str,
-        model: &str,
-        strategy: &ConversationStrategy,
-        visited: &mut HashSet<String>,
-    ) -> Result<PipeLineRunner> {
-        debug!("Agent: {} - Build Pipeline Runner", agent_id);
-
-        let agent_config = self.find_agent_config(agent_id).await?;
-
-        // orchestrator is a single agent
-        let orchestrator_agent = self
-            .build_agent_for_id(
-                None,
-                agent_id,
-                llm,
-                model,
-                strategy,
-                agent_config.clone().preset,
-            )
-            .await?;
-        let orchestrator = AgentHandle::Single(orchestrator_agent);
-
-        let mut agent_handles = HashMap::new();
-        if let Some(pipeline_config) = agent_config.clone().pipeline {
-            for sub_agent in pipeline_config.available_agents {
-                // info!("Sub agent: {:?}", sub_agent);
-                let sub_agent_handle = self
-                    .build_agent_handle(
-                        Some(agent_id.to_string()),
-                        &sub_agent.id,
-                        llm,
-                        model,
-                        strategy,
-                        sub_agent.preset,
-                        visited,
-                    )
-                    .await?;
-                agent_handles.insert(sub_agent.id, sub_agent_handle);
-            }
-        };
-
-        Ok(PipeLineRunner::new(
-            orchestrator,
-            agent_config,
-            agent_handles,
-        ))
+    /// Look up an [`AgentConfig`] by ID.  Returns an error if not registered.
+    pub async fn find_agent_config(&self, agent_id: &str) -> Result<AgentConfig> {
+        self.agent_registry
+            .find(agent_id)
+            .ok_or_else(|| anyhow::anyhow!("Agent '{}' not found", agent_id))
+            .cloned()
     }
 
-    pub async fn build_agent_handle(
-        &self,
-        parent_agent_id: Option<String>,
-        agent_id: &str,
-        llm: &str,
-        model: &str,
-        strategy: &ConversationStrategy,
-        preset: Option<Preset>,
-        visited: &mut HashSet<String>,
-    ) -> Result<AgentHandle> {
-        let config = self.find_agent_config(agent_id).await?;
+    /// Build a [`Runnable`] from an [`AgentInput`], handling both single-agent and
+    /// pipeline topologies.
+    ///
+    /// Entry point for request handling. Delegates to [`build_runnable_agent`](Self::build_runnable_agent)
+    /// with a fresh cycle-detection set.
+    pub async fn build_runnable(&self, input: &AgentInput) -> Result<Arc<dyn Runnable>> {
+        info!("Agent: {} - Build Runnable", input.agent_id);
 
+        self.build_runnable_agent(input, &mut HashSet::new()).await
+    }
+
+    /// Recursively build a [`Runnable`] for `input`, dispatching on [`ExecutionType`]:
+    ///
+    /// - `SingleAgent` / `PipelineAgent` → wrapped in [`SingleAgent`].
+    /// - `Pipeline` → each sub-agent in the config's `available_agents` list is built
+    ///   recursively and collected into a [`PipeLineAgent`]. Each sub-agent's strategy
+    ///   and system prompt come from its own config; LLM and model are inherited from
+    ///   the top-level input.
+    ///
+    /// `visited` tracks agent IDs seen in the current recursion path; a repeated ID
+    /// causes an immediate error to break cycles.
+    pub async fn build_runnable_agent(
+        &self,
+        input: &AgentInput,
+        visited: &mut HashSet<String>,
+    ) -> Result<Arc<dyn Runnable>> {
+        let config = self.find_agent_config(&input.agent_id).await?;
         debug!(
             execution= ?config.execution,
-           "Agent: {} - Build Agent Handle", config.id
+           "Agent: {} - Build Runnable Agent", config.id
         );
 
         if !visited.insert(config.id.to_string()) {
@@ -270,27 +269,49 @@ impl AgentService {
                 config.id
             ));
         }
+
+        let agent = self
+            .build_agent_for_id(
+                Some(input.agent_id.clone()),
+                &input.agent_id,
+                &input.llm,
+                &input.model,
+                input.system_prompt.clone(),
+                &input.strategy,
+                input.preset.clone(),
+            )
+            .await?;
+
         match config.execution {
             ExecutionType::SingleAgent | ExecutionType::PipelineAgent => {
-                let agent = self
-                    .build_agent_for_id(parent_agent_id, agent_id, llm, model, strategy, preset)
-                    .await?;
-                Ok(AgentHandle::Single(agent))
+                Ok(Arc::new(SingleAgent::new(agent, input.strategy.clone())))
             }
             ExecutionType::Pipeline => {
-                let runner =
-                    Box::pin(self.build_pipeline_runner(agent_id, llm, model, strategy, visited))
-                        .await?;
-                Ok(AgentHandle::Pipeline(Arc::new(runner)))
+                let pipeline_config = config.pipeline.expect(&format!(
+                    "Pipeline agent {} should have sub agents",
+                    input.agent_id
+                ));
+                let mut subs = Vec::new();
+                for sub_agent in pipeline_config.available_agents {
+                    let config = self.find_agent_config(&sub_agent.id).await?;
+                    let strategy = config.get_strategy();
+                    let sub_input = AgentInput::new(
+                        sub_agent.id.clone(),
+                        input.llm.clone(),
+                        input.model.clone(),
+                        Some(config.system_prompt),
+                        strategy,
+                        sub_agent.preset.clone()
+                    );
+                    let sub_agent = Box::pin(self.build_runnable_agent(&sub_input, visited))
+                        .await
+                        .context(format!("Sub Agent error: {}", sub_agent.id))?;
+                    subs.push(sub_agent);
+                }
+                let pipeline = PipeLineAgent::new(agent, input.strategy.clone(), subs);
+                Ok(Arc::new(pipeline) as Arc<dyn Runnable>)
             }
         }
-    }
-
-    pub async fn find_agent_config(&self, agent_id: &str) -> Result<AgentConfig> {
-        self.agent_registry
-            .find(agent_id)
-            .ok_or_else(|| anyhow::anyhow!("Agent '{}' not found", agent_id))
-            .cloned()
     }
 
     /// Resolve a [`Provider`] enum variant from a provider ID and optional model override.

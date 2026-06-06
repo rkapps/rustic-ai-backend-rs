@@ -1,7 +1,6 @@
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::Preset;
+use crate::{Preset, services::config::agent::HistoryMode::Full};
 
 /// Controls how an agent participates in request handling.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -34,9 +33,18 @@ pub struct AgentConfig {
     pub mcp_tools: Vec<String>,
     pub model_assignment: ModelAssignment,
     /// Conversation strategy overrides; `None` uses the server default.
-    pub conversation: Option<ConversationConfig>,
+    pub conversation: ConversationConfig,
     /// Pipeline-specific settings; `None` for `SingleAgent` execution types.
     pub pipeline: Option<PipelineConfig>,
+}
+
+impl AgentConfig {
+    pub fn get_strategy(&self) -> CompletionStrategy {
+        self.conversation.default_strategy.clone()
+    }
+    pub fn get_history_mode(&self) -> HistoryMode {
+        self.conversation.history_mode.clone().unwrap_or(Full)
+    }
 }
 
 /// Default and allowed provider/model combinations for an agent.
@@ -53,7 +61,6 @@ pub struct ModelProvider {
     pub provider: String,
     pub model: String,
 }
-
 
 /// Pipeline-specific configuration used when `execution` is `Pipeline` or `PipelineAgent`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,55 +81,40 @@ pub struct PipelineConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AvailableAgent {
     pub id: String,
-    pub context: AgentContext,
+    pub context: MessageContext,
     #[serde(default)]
     pub preset: Option<Preset>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum AgentContext {
+pub enum MessageContext {
     Goal, // original user messages
     Last, // last stage output
     All,  // full accumulated context
 }
 
-
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ConversationConfig {
-    pub default_strategy: ConversationStrategy,
-    pub allowed_strategies: Vec<ConversationStrategy>,
-    pub stateful: Option<StatefulConfig>,
+    pub default_strategy: CompletionStrategy,
+    pub allowed_strategies: Vec<CompletionStrategy>,
+    pub history_mode: Option<HistoryMode>,
+    pub max_turns: Option<u32>, // only valid for trimmed
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum ConversationStrategy {
-    #[default]
+pub enum CompletionStrategy {
     Stateless,
+    #[default]
     Stateful,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum HistoryMode {
+    #[default]
     Full,
     Trimmed,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct StatefulConfig {
-    pub history_mode: HistoryMode,
-    pub max_turns: Option<u32>,  // only valid for trimmed
-}
-
-
-impl StatefulConfig {
-    pub fn validate(&self) -> Result<()> {
-        if self.history_mode == HistoryMode::Full && self.max_turns.is_some() {
-            return Err(anyhow::anyhow!("max_turns is not valid for history_mode=full"));
-        }
-        Ok(())
-    }
-}

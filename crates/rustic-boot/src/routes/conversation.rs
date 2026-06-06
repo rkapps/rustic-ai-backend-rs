@@ -95,7 +95,7 @@ pub async fn update_conversation_handler(
     let service = boot_state.conversation_service()?; // ← one line
 
     let conversation = service
-        .update_conversation(&claims.sub, &id,payload)
+        .update_conversation(&claims.sub, &id, payload)
         .await
         .map_err(|e| {
             (
@@ -183,6 +183,7 @@ pub async fn send_turn_handler(
     Ok(Json(response))
 }
 
+#[axum::debug_handler]
 pub async fn send_turn_streaming_handler(
     State(boot_state): State<Arc<BootState>>,
     Extension(user): Extension<FirebaseClaims>, // 👈 opt-in

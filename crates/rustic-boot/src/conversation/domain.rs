@@ -2,7 +2,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use rustic_agent::{
     client::response::CompletionResponseTokenUsage,
-    services::config::agent::{ConversationStrategy, HistoryMode, StatefulConfig},
+    services::config::agent::{CompletionStrategy, HistoryMode},
 };
 use rustic_storage::core::repository::RepoModel;
 use serde::{Deserialize, Serialize};
@@ -34,9 +34,9 @@ pub struct ConversationRequest {
     pub stream: bool,
     pub system_prompt: Option<String>,
 
-    pub strategy: Option<ConversationStrategy>,
-    pub stateful: Option<StatefulConfig>,
-
+    pub strategy: Option<CompletionStrategy>,
+    pub history_mode: Option<HistoryMode>,
+    pub max_turns: Option<u32>, // only valid for trimmed
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -49,12 +49,12 @@ pub struct Conversation {
     pub agent_id: Option<String>,      // None for chat
     pub system_prompt: Option<String>, // copied from template at creation
     pub orig_system_prompt: Option<String>,
-    pub llm: String,                   // provider user picked
-    pub model: String,                 // model user picked
+    pub llm: String,   // provider user picked
+    pub model: String, // model user picked
     pub stream: bool,
     pub response_id: Option<String>,
     #[serde(default)]
-    pub strategy: ConversationStrategy,
+    pub strategy: CompletionStrategy,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub history_mode: Option<HistoryMode>, // None when strategy=stateless
     #[serde(default)]
@@ -84,10 +84,8 @@ impl Conversation {
         let title = request.title.unwrap_or_default();
         let now = Utc::now();
 
-        let (history_mode, max_turns) = match &request.stateful {
-            Some(s) => (Some(s.history_mode.clone()), s.max_turns),
-            None => (None, None),
-        };
+        let history_mode = Some(request.history_mode.clone().unwrap_or_default());
+        let max_turns = Some(request.max_turns.clone().unwrap_or_default());
 
         Conversation {
             agent_id: request.agent_id,
@@ -104,7 +102,7 @@ impl Conversation {
             orig_system_prompt: request.system_prompt,
             template_id: request.template_id,
             uid,
-            strategy: request.strategy.unwrap_or(ConversationStrategy::Stateless),
+            strategy: request.strategy.unwrap_or(CompletionStrategy::Stateless),
             history_mode,
             max_turns,
             usage: None,
@@ -115,16 +113,14 @@ impl Conversation {
             total_tokens_cost: 0.0,
         }
     }
-
 }
-
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ConversationUpdateRequest {
     pub title: Option<String>,
     pub system_prompt: Option<String>,
-    pub history_mode: Option<HistoryMode>,  // only valid if strategy=stateful
-    pub max_turns: Option<u32>,             // only valid if history_mode=trimmed
+    pub history_mode: Option<HistoryMode>, // only valid if strategy=stateful
+    pub max_turns: Option<u32>,            // only valid if history_mode=trimmed
 }
 
 impl Conversation {
@@ -136,14 +132,18 @@ impl Conversation {
             self.system_prompt = Some(system_prompt);
         }
         if let Some(history_mode) = request.history_mode {
-            if self.strategy != ConversationStrategy::Stateful {
-                return Err(anyhow::anyhow!("history_mode only valid for stateful conversations"));
+            if self.strategy != CompletionStrategy::Stateful {
+                return Err(anyhow::anyhow!(
+                    "history_mode only valid for stateful conversations"
+                ));
             }
             self.history_mode = Some(history_mode);
         }
         if let Some(max_turns) = request.max_turns {
             if self.history_mode != Some(HistoryMode::Trimmed) {
-                return Err(anyhow::anyhow!("max_turns only valid for trimmed history mode"));
+                return Err(anyhow::anyhow!(
+                    "max_turns only valid for trimmed history mode"
+                ));
             }
             self.max_turns = Some(max_turns);
         }
@@ -151,7 +151,6 @@ impl Conversation {
         Ok(())
     }
 }
-
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Turn {

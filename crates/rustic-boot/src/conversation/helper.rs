@@ -1,23 +1,60 @@
+use anyhow::{Context, Result};
+use std::sync::Arc;
+use tracing::info;
+
 use rustic_agent::{
-    client::{message::Message, response::CompletionResponseTokenUsage},
-    services::{config::agent::{ConversationStrategy, HistoryMode}, registry::provider::ProviderRegistry},
+    AgentService,
+    agents::{
+        domain::{AgentInput, CompletionTurn},
+        runner::Runnable,
+    },
+    client::{response::CompletionResponseTokenUsage},
+    services::{
+        config::agent::{CompletionStrategy, HistoryMode},
+        registry::provider::ProviderRegistry,
+    },
 };
 
-use crate::conversation::domain::Turn;
+use crate::{Conversation, conversation::domain::Turn};
 
-pub fn build_completions_messages(
+pub async fn build_agent_runner(
+    agent_service: Arc<AgentService>,
+    conversation: &Conversation,
+) -> Result<Arc<dyn Runnable>> {
+
+    let agent_id = conversation.agent_id.clone().context(format!(
+        "Conversation {} does not have an agent",
+        conversation.id
+    ))?;
+
+    let input = AgentInput::new(
+        agent_id,
+        conversation.llm.clone(),
+        conversation.model.clone(),
+        conversation.system_prompt.clone(),
+        conversation.strategy.clone(),
+        None,
+    );
+
+    Ok(agent_service.build_runnable(&input).await?)
+}
+
+pub fn build_completion_turns(
+    conversation: &Conversation,
     turns: Vec<Turn>,
-    strategy: &ConversationStrategy,
-    history_mode: Option<&HistoryMode>,
-    max_turns: Option<u32>,
-) -> Vec<Message> {
-    match strategy {
-        ConversationStrategy::Stateless => {
+) -> Vec<CompletionTurn> {
+    info!(
+        "Conversation strategy: {:?} history mode: {:?}",
+        conversation.strategy, conversation.history_mode
+    );
+
+    let turns = match conversation.strategy {
+        CompletionStrategy::Stateless => {
             // no history — current message will be added after
             vec![]
         }
-        ConversationStrategy::Stateful => {
-            let turns = match (history_mode, max_turns) {
+        CompletionStrategy::Stateful => {
+            let turns = match (conversation.history_mode.clone(), conversation.max_turns) {
                 (Some(HistoryMode::Trimmed), Some(max)) => {
                     let skip = turns.len().saturating_sub(max as usize);
                     turns.into_iter().skip(skip).collect::<Vec<_>>()
@@ -25,22 +62,57 @@ pub fn build_completions_messages(
                 _ => turns, // full — all turns
             };
 
-            let mut messages = Vec::new();
+            let mut completion_turns = Vec::new();
             for turn in turns {
-                messages.push(Message::User {
-                    content: turn.user_prompt,
-                    response_id: None,
-                });
-                messages.push(Message::Assistant {
-                    content: turn.response_content,
+                completion_turns.push(CompletionTurn {
+                    sequence: turn.sequence as u32,
+                    user_content: turn.user_prompt,
+                    response_content: turn.response_content,
                     response_id: turn.response_id,
-                });
+                })
             }
-            messages
+            completion_turns
         }
-    }
+    };
+
+    turns
 }
 
+// pub fn build_completions_messages(
+//     turns: Vec<Turn>,
+//     strategy: &CompletionStrategy,
+//     history_mode: Option<&HistoryMode>,
+//     max_turns: Option<u32>,
+// ) -> Vec<Message> {
+//     match strategy {
+//         CompletionStrategy::Stateless => {
+//             // no history — current message will be added after
+//             vec![]
+//         }
+//         CompletionStrategy::Stateful => {
+//             let turns = match (history_mode, max_turns) {
+//                 (Some(HistoryMode::Trimmed), Some(max)) => {
+//                     let skip = turns.len().saturating_sub(max as usize);
+//                     turns.into_iter().skip(skip).collect::<Vec<_>>()
+//                 }
+//                 _ => turns, // full — all turns
+//             };
+
+//             let mut messages = Vec::new();
+//             for turn in turns {
+//                 messages.push(Message::User {
+//                     content: turn.user_prompt,
+//                     response_id: None,
+//                 });
+//                 messages.push(Message::Assistant {
+//                     content: turn.response_content,
+//                     response_id: turn.response_id,
+//                 });
+//             }
+//             messages
+//         }
+//     }
+// }
 
 pub fn calculate_turn_cost(
     llm: &str,

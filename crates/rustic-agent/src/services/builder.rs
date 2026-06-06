@@ -16,7 +16,7 @@ use crate::{
         local::completion::LocalClient,
         openai::{self, completion::OpenAIClient},
     },
-    services::{agent::AgentService, config::agent::ConversationStrategy},
+    services::{agent::AgentService, config::agent::CompletionStrategy},
     tools::mcp::MCPServerSetting,
 };
 
@@ -51,7 +51,7 @@ pub struct AgentBuilder<'a> {
     /// Tools accumulated via `with_tool*` — registered into the shared registry on `build`.
     pending_tools: Vec<Arc<dyn Tool>>,
     filtered_mcp: Option<MCPRegistry>,
-    strategy: Option<ConversationStrategy>,
+    strategy: Option<CompletionStrategy>,
 }
 
 impl<'a> AgentBuilder<'a> {
@@ -80,7 +80,7 @@ impl<'a> AgentBuilder<'a> {
         self
     }
 
-    pub fn with_strategy(mut self, strategy: ConversationStrategy) -> Self {
+    pub fn with_strategy(mut self, strategy: CompletionStrategy) -> Self {
         self.strategy = Some(strategy);
         self
     }
@@ -312,12 +312,11 @@ impl<'a> AgentBuilder<'a> {
         let enable_cache = self.enable_cache;
 
         let store = match &self.strategy {
-            Some(ConversationStrategy::Stateful) => true,
-            Some(ConversationStrategy::Stateless) => false,
+            Some(CompletionStrategy::Stateful) => true,
+            Some(CompletionStrategy::Stateless) => false,
             None => false, // default to stateless
         };
 
-        
         Ok(Agent {
             id: self.id,
             llm,
