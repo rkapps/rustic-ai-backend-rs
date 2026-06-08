@@ -106,9 +106,8 @@ pub struct CompletionChunkResponse {
     /// Raw extended-thinking text as returned by the provider.
     pub thinking: String,
     /// pipeline status — UI only, never stored in turns
-    pub status: String,      
+    pub status: String,
     /// `true` on the last chunk of the stream.
-
     pub is_final: bool,
     /// Token usage populated on the final chunk; `None` for intermediate chunks.
     pub usage: Option<CompletionResponseTokenUsage>,
@@ -145,7 +144,6 @@ impl CompletionChunkResponse {
         }
     }
 
-
     /// Build a chunk carrying an incremental chain-of-thought fragment.
     pub fn thought(id: String, thought: String) -> CompletionChunkResponse {
         CompletionChunkResponse {
@@ -155,7 +153,6 @@ impl CompletionChunkResponse {
             ..Default::default()
         }
     }
-
 
     pub fn status(status: String) -> CompletionChunkResponse {
         CompletionChunkResponse {
@@ -186,6 +183,4 @@ impl CompletionChunkResponse {
             ..Default::default()
         }
     }
-
-    
 }
