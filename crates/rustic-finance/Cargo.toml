@@ -1,0 +1,36 @@
+[package]
+name = "rustic-finance"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = ["full"]
+reader = []
+writer = ["reader"]
+full = ["reader", "writer"]
+
+
+[dependencies]
+anyhow.workspace=true
+async-trait.workspace=true
+bson.workspace=true
+chrono.workspace = true
+chrono-tz.workspace = true
+
+futures.workspace = true
+rust_decimal.workspace=true
+rust_decimal_macros.workspace=true
+serde.workspace=true
+serde_json.workspace=true
+serde_with.workspace=true
+ta.workspace=true
+
+tokio.workspace=true
+tracing.workspace=true
+
+
+#internal crates
+rustic-core.workspace=true
+rustic-providers.workspace=true
+rustic-storage.workspace=true
+rustic-ml.workspace=true

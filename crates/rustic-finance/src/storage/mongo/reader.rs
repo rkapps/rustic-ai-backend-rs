@@ -1,0 +1,31 @@
+use crate::storage::{
+    mongo::manager::FinanceMongoStorageManager,
+    reader::{
+        StorageReader, TickerControlStorageReader, TickerEmbeddingStorageReader, TickerHistoryStorageReader, TickerIndicatorStorageReader, TickerSentimentStorageReader, TickerStorageReader
+    },
+};
+use std::fmt::Debug;
+
+#[derive(Debug, Clone)]
+pub struct FinanceMongoStorageReader {
+    pub(crate) manager: FinanceMongoStorageManager,
+}
+impl FinanceMongoStorageReader {
+    pub(crate) fn new(manager: FinanceMongoStorageManager) -> Self {
+        Self { manager }
+    }
+}
+
+// 2. The Blanket Implementation (The "Glue")
+impl<T> StorageReader for T where
+    T: TickerControlStorageReader
+        + TickerStorageReader
+        + TickerHistoryStorageReader
+        + TickerIndicatorStorageReader
+        + TickerSentimentStorageReader
+        + TickerEmbeddingStorageReader
+        + Send
+        + Sync
+        + Debug
+{
+}

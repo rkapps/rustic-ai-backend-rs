@@ -1,0 +1,56 @@
+use std::{collections::HashMap, sync::Arc};
+
+use anyhow::Result;
+use async_trait::async_trait;
+use rustic_core::Tool;
+use serde_json::{Value, json};
+use tracing::{debug, info};
+
+use crate::storage::reader::StorageReader;
+
+#[derive(Debug)]
+pub struct TickerTaxonomyTool {
+    storage_service: Arc<dyn StorageReader>,
+}
+impl TickerTaxonomyTool {
+    pub fn new(storage_service: Arc<dyn StorageReader>) -> TickerTaxonomyTool {
+        Self { storage_service }
+    }
+}
+
+#[async_trait]
+impl Tool for TickerTaxonomyTool {
+    fn name(&self) -> String {
+        "ticker_taxonomy".to_string()
+    }
+
+    fn description(&self) -> String {
+        "Returns all available sectors and their industries from the database. \
+         ALWAYS call this tool first before calling ticker_screening when the user \
+         asks to find or compare stocks by sector, industry or theme. \
+         Use the returned values to populate the industry parameter in ticker_screening exactly."
+            .to_string()
+    }
+
+    fn parameters(&self) -> serde_json::Value {
+        json!({
+            "type": "object",
+            "properties": {},
+        })
+    }
+
+    async fn execute(&self, _value: serde_json::Value) -> Result<Value> {
+        let start = std::time::Instant::now();
+
+        info!("Ticker taxonomy");
+        let ticker_groups = self.storage_service.get_ticker_groups().await?;
+        let mut groups: HashMap<String, Vec<String>> = HashMap::new();
+        for group in ticker_groups {
+            groups.entry(group.sector).or_default().push(group.industry);
+        }
+        debug!("Ticker groups: {:?}", groups);
+        let elapsed = start.elapsed();
+        info!("Groups: {:?}  {:.1}s", groups.len(), elapsed.as_secs_f32());
+        Ok(json!({"groups": groups }))
+    }
+}
