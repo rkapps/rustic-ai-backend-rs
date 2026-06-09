@@ -350,7 +350,7 @@ impl Runnable for PipeLineAgent {
                             }
                         };
 
-                        debug!("Chunk: {:?}", chunk);
+                        trace!("Chunk: {:?}", chunk);
 
                         if chunk.is_final {
                             info!(
@@ -358,7 +358,7 @@ impl Runnable for PipeLineAgent {
                                 "Agent: {} Synthesising done.", agent_id
                             );
 
-                            let response_id = chunk.response_id.clone();
+                            // let response_id = chunk.response_id.clone();
                             let mut final_chunk = chunk.clone();
                             final_chunk.is_final = false;
                             let _ = tx.send(Ok(final_chunk)).await;
