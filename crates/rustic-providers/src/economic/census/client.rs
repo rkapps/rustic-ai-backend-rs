@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use rustic_core::HttpClient;
 use std::sync::Arc;
-use tracing::info;
+use tracing::{info, warn};
 
 use super::model::{CensusRawResponse, CensusRecord};
 use crate::economic::traits::EconomicProvider;
@@ -59,10 +59,14 @@ impl CensusClient {
             CENSUS_BASE_URL, year, dataset, vars, geo, self.api_key
         );
         info!("ACS Url: {}", url);
-
-        let raw: CensusRawResponse = self.http_client.get_request(url, None).await?;
-
-        Ok(self.parse_response(raw, variables))
+        match self.http_client.get_request(url, None).await {
+            Ok(raw) => Ok(self.parse_response(raw, variables)),
+            Err(e) if e.to_string().contains("404") => {
+                warn!("Census ACS not available for year: {} dataset: {}", year, dataset);
+                Ok(vec![])
+            }
+            Err(e) => Err(e),
+        }
     }
 
     /// Fetch Small Area Income and Poverty Estimates (SAIPE) data.
