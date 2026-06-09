@@ -14,7 +14,7 @@ use rustic_core::{Tool, logger::set_logger};
 use rustic_economic::service::EconomicService;
 use rustic_finance::service::FinanceService;
 use rustic_ml::embeddings::openai::OpenAIEmbeddingClient;
-use tracing::debug;
+use tracing::info;
 
 #[tokio::main]
 
@@ -39,16 +39,20 @@ async fn main() -> Result<()> {
     let mongo_uri = env::var("MONGO_URI").expect("MONGO_URI envrionment variable not set");
 
     let mongo_db =
-        env::var("FINTRACKER_DB_NAME").expect("FINTRACKER_DB_NAME envrionment variable not set");
-    debug!("Mongo uri: {:?} db: {:?}", mongo_uri, mongo_db);
+        env::var("RUSTIC_FINANCE_DB_NAME").expect("RUSTIC_FINANCE_DB_NAME envrionment variable not set");
+    info!("Finance Data Mongo uri: {:?} db: {:?}", mongo_uri, mongo_db);
     let finance_service =
         FinanceService::new_reader(&mongo_uri, &mongo_db, embedding_client).await?;
 
-    // Find these again for rusticai
+    // economic data
     let mongo_db =
-        env::var("RUSTIC_AI_DB_NAME").expect("RUSTIC_AI_DB_NAME envrionment variable not set");
-
+        env::var("RUSTIC_ECONOMIC_DB_NAME").expect("RUSTIC_ECONOMIC_DB_NAME envrionment variable not set");
+    info!("Economic data Mongo uri: {:?} db: {:?}", mongo_uri, mongo_db);
     let economic_service = EconomicService::new_reader(&mongo_uri, &mongo_db).await?;
+
+    let mongo_db =
+        env::var("RUSTIC_PLATFORM_DB_NAME").expect("RUSTIC_AI_DB_NAME envrionment variable not set");
+    info!("Platform Data Mongo uri: {:?} db: {:?}", mongo_uri, mongo_db);
 
     //bset specific
     let bset_data_path = env::var("RUSTIC_AI_BSET_DATA_PATH")
