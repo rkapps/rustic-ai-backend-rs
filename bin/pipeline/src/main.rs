@@ -26,8 +26,8 @@ async fn main() -> Result<()> {
     )
     .await?;
     let pipeline = EconomicDataPipeline::new(Arc::new(economic_service));
-    // let _ = pipeline.run_fred(false).await;
-    // let _ = pipeline.run_bea(false).await;
+    let _ = pipeline.run_fred(false).await;
+    let _ = pipeline.run_bea(false).await;
     let _ = pipeline.run_census(false).await;
 
     Ok(())
