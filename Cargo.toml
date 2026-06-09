@@ -10,7 +10,7 @@ members = [
     "crates/rustic-providers", 
     "crates/rustic-storage" , 
     "crates/rustic-finance"
-, "bin/admin"]
+, "bin/admin", "bin/shared"]
 
 [workspace.dependencies]
 anyhow = "1.0.100"

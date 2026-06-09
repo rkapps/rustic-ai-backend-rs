@@ -1,8 +1,27 @@
 use anyhow::{Context, Result};
+use bin_shared::get_finance_service;
 use calamine::{Reader, Xlsx, open_workbook};
 use rustic_core::config::load::download_gcs_to_file;
-use rustic_finance::domain::dto::ticker_seed::TickerSeed;
 use std::path::PathBuf;
+
+use rustic_finance::{domain::dto::ticker_seed::TickerSeed};
+
+pub async fn load_tickers(mongo_uri: &str, file: PathBuf) -> Result<()> {
+
+    let file_path = if file.to_str().unwrap_or("").starts_with("gs://") {
+        load_ticker_seeds_from_gcs(file.to_str().unwrap()).await?
+    } else {
+        file
+    };
+    let ticker_seeds = load_ticker_seeds_from_file(file_path)?;
+
+    let service = get_finance_service(mongo_uri).await?;
+    let _ = service.load_tickers(&ticker_seeds, true).await?;
+
+    Ok(())
+}
+
+
 
 pub fn load_ticker_seeds_from_file(file: PathBuf) -> Result<Vec<TickerSeed>> {
     let mut workbook: Xlsx<_> =

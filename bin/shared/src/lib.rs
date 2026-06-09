@@ -1,21 +1,11 @@
 use anyhow::Result;
-use rustic_ml::embeddings::openai::OpenAIEmbeddingClient;
-use tracing::info;
-use std::{env, path::PathBuf, sync::Arc};
+use rustic_economic::service::EconomicService;
+use std::{env, sync::Arc};
 
 use rustic_finance::service::FinanceService;
+use rustic_ml::embeddings::openai::OpenAIEmbeddingClient;
 
-use crate::tickers::seed::{load_ticker_seeds_from_file, load_ticker_seeds_from_gcs};
-
-pub async fn load_tickers(mongo_uri: &str, file: PathBuf) -> Result<()> {
-
-    let file_path = if file.to_str().unwrap_or("").starts_with("gs://") {
-        load_ticker_seeds_from_gcs(file.to_str().unwrap()).await?
-    } else {
-        file
-    };
-    let ticker_seeds = load_ticker_seeds_from_file(file_path)?;
-
+pub async fn get_finance_service(mongo_uri: &str) -> Result<(FinanceService)> {
     let mongo_db = env::var("RUSTIC_FINANCE_DB_NAME")
         .expect("RUSTIC_FINANCE_DB_NAME envrionment variable not set");
     let openai_api_key: String =
@@ -29,8 +19,7 @@ pub async fn load_tickers(mongo_uri: &str, file: PathBuf) -> Result<()> {
     let coinmarketcap_key = env::var("COINMARKETCAP_API_KEY")
         .expect("COINMARKETCAP_API_KEY not found in environment variables.");
 
-
-    let service = FinanceService::new(
+    FinanceService::new(
         &mongo_uri,
         &mongo_db,
         embedding_client,
@@ -38,10 +27,19 @@ pub async fn load_tickers(mongo_uri: &str, file: PathBuf) -> Result<()> {
         Some(tiingo_token),
         Some(coinmarketcap_key),
     )
-    .await?;
+    .await
+}
 
-    info!("reached");
-    let _ = service.load_tickers(&ticker_seeds, true).await?;
+pub async fn get_economic_service(mongo_uri: &str) -> Result<EconomicService> {
+    let mongo_db = env::var("RUSTIC_ECONOMIC_DB_NAME")
+        .expect("RUSTIC_AI_DB_NAME envrionment variable not set");
 
-    Ok(())
+    EconomicService::new(
+        &mongo_uri,
+        &mongo_db,
+        env::var("FRED_API_KEY").ok(),
+        env::var("BEA_API_KEY").ok(),
+        env::var("CENSUS_API_KEY").ok(),
+    )
+    .await
 }

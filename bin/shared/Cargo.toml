@@ -1,18 +1,13 @@
 [package]
-name = "rustic-pipeline"
+name = "bin-shared"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow.workspace = true
-clap.workspace = true
-tokio.workspace = true
-tracing.workspace=true
-
-
-bin-shared = { path = "../shared" }
-
+anyhow.workspace=true
 rustic-core.workspace=true
 rustic-economic = { workspace = true, features = ["writer"] }
 rustic-providers.workspace=true
 rustic-storage.workspace = true
+rustic-ml.workspace=true
+rustic-finance.workspace=true

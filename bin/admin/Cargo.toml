@@ -11,6 +11,8 @@ tokio.workspace = true
 tracing.workspace=true
 
 # internal crates
+bin-shared = { path = "../shared" }
+
 rustic-boot.workspace=true
 rustic-economic.workspace=true
 rustic-finance.workspace=true
