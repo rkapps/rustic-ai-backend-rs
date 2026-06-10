@@ -145,6 +145,9 @@ impl AgentService {
         let agent_config = self.find_agent_config(agent_id).await?;
 
         let provider = self.resolve_provider(agent_id, llm, Some(model))?;
+        
+        // default the system prompt from agent config
+        let system_prompt= system_prompt.or(Some(agent_config.system_prompt));
 
         let mut dpreset = match &provider {
             Provider::Local { .. } => Preset::Local,
