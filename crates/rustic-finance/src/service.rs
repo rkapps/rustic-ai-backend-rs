@@ -11,12 +11,14 @@ use crate::{
 #[cfg(feature = "reader")]
 use crate::{
     domain::{
-        TickerEntity, TickerGroup, TickerNewsEntity, dto::{ticker_chart_entity::TickerChartEntity, ticker_search_param::TickerSearchParam}
+        TickerEntity, TickerGroup, TickerNewsEntity,
+        dto::{ticker_chart_entity::TickerChartEntity, ticker_search_param::TickerSearchParam},
     },
     storage::mongo::reader::FinanceMongoStorageReader,
 };
 
 use crate::{
+    core::tickers::news::get_ticker_news,
     storage::mongo::manager::FinanceMongoStorageManager,
     tools::{
         ticker_indicator::TickerIndicatorTool, ticker_peers::TickerPeersTool,
@@ -212,5 +214,21 @@ impl FinanceService {
             update,
         )
         .await
+    }
+
+    #[cfg(feature = "writer")]
+    pub async fn update_tickers_news(&self) -> Result<()> {
+        use crate::{core::tickers::news::update_tickers_news, storage::TickerStorageReader};
+
+        let writer = self.writer.as_ref().expect("writer not initialized");
+        let reader = self.reader.as_ref().expect("reader not initialized");
+        let provider_service = self
+            .provider_service
+            .as_ref()
+            .expect("provider service not initialized");
+
+        let all_tickers = reader.get_tickers_by_total_assets().await?;
+        update_tickers_news(writer.clone(), provider_service.clone(), all_tickers).await?;
+        Ok(())
     }
 }

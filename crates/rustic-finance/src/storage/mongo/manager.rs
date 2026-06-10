@@ -44,6 +44,12 @@ impl FinanceMongoStorageManager {
             TICKER_EMBEDDING_COLLECTION_NAME.to_string(),
         )
         .await?;
+
+        mdb.register_collection::<String, TickerNews>(
+            TICKER_NEWS_COLLECTION_NAME.to_string(),
+        )
+        .await?;
+
         Ok(FinanceMongoStorageManager { db: mdb })
     }
 

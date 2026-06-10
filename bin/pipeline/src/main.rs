@@ -20,6 +20,7 @@ enum PipelineCommands {
     UpdateTickersEod,
     UpdateStocksEtfsRealtime,
     UpdateCryptosRealtime,
+    UpdateTickersNews
 }
 
 #[tokio::main]
@@ -66,6 +67,14 @@ async fn main() -> Result<()> {
                 Err(e) => error!("Tickers EOD update failed: {:?}", e),
             }
         }
+        PipelineCommands::UpdateTickersNews => {
+            info!("Tickers News PipeLine started...");
+            let service = get_finance_service(&mongo_uri).await?;
+            match service.update_tickers_news().await {
+                Ok(_) => info!("Tickers News update completed successfully."),
+                Err(e) => error!("Tickers News update failed: {:?}", e),
+            }
+        }        
     }
 
     Ok(())
