@@ -250,6 +250,13 @@ impl Runnable for PipeLineAgent {
                     }
                 };
 
+                info!(
+                    stop= %decision.stop,
+                    execution= ?decision.execution,
+                    agents= ?format_args!("{:#?}", decision.agents),
+                    "Agent: {} Decision", agent_id
+                );
+
                 // set the last resonse id.
                 last_response_id = if response.response_id.clone().is_empty() {
                     None
@@ -265,12 +272,7 @@ impl Runnable for PipeLineAgent {
                     .send(Ok(CompletionChunkResponse::status(status.clone())))
                     .await;
 
-                info!(
-                    stop= %decision.stop,
-                    execution= ?decision.execution,
-                    agents= ?format_args!("{:#?}", decision.agents),
-                    "Agent: {} Decision", agent_id
-                );
+              
 
                 if decision.stop {
                     let start = std::time::Instant::now();
@@ -498,6 +500,10 @@ impl PipeLineAgent {
     ) -> Result<(CompletionResponse, StageDecision)> {
         let agent = self.get_agent();
         let messages = self.build_orchesrator_messages(turns, prompt, response_id);
+        debug!(
+            messages= ?messages,
+            "Agent: {}", agent.id
+        );
         let response = agent.complete(&messages).await?;
         let decision = self.build_decision(&response)?;
         Ok((response, decision))
