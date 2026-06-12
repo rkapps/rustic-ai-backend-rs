@@ -7,6 +7,7 @@ use rustic_core::{HttpClient, HttpError, HttpResult};
 use tracing::{debug, error, trace};
 
 use crate::{
+    ToolCallRequest,
     client::{
         llm::{CompletionStreamResponse, LlmClient},
         request::CompletionRequest,
@@ -14,14 +15,14 @@ use crate::{
             CompletionChunkResponse, CompletionResponse, CompletionResponseContent,
             CompletionResponseTokenUsage,
         },
-        tools::ToolCallRequest,
     },
     providers::gemini::{
         GEMINI_BASE_URL,
         request::GeminiInteractionsRequest,
         response::{
             GeminiInteractionsChunkResponse, GeminiInteractionsResponse,
-            GeminiInteractionsResponseOutput::{FunctionCall, Text, Thought},
+            GeminiStepsResponseOutput::{FunctionCall, ModelOutput, Thought, UserInput},
+            GeminiTextContent,
         },
     },
 };
@@ -64,13 +65,13 @@ impl GeminiClient {
             .map_err(|_| HttpError::ApiKeyParsingFailed)?;
 
         headers.insert("x-goog-api-key", api_key);
-        headers.insert("Api-Revision", HeaderValue::from_static("2026-05-07"));
+        // headers.insert("Api-Revision", HeaderValue::from_static("2026-05-20"));
 
         let grequest = GeminiInteractionsRequest::new(request)
             .map_err(|e| HttpError::CompletionRequestError(e.to_string()))?;
 
         debug!(target: "agent-gemini", "Gemini complete_interactions: {:#?}", grequest);
-
+        println!("before ------------------------");
         let body = serde_json::json!(grequest);
         let gresponse = self
             .http_client
@@ -81,16 +82,35 @@ impl GeminiClient {
 
         let id = gresponse.id;
         let mut rcontents: Vec<CompletionResponseContent> = Vec::new();
-
-        for output in gresponse.outputs {
-            match output {
-                Text { text } => {
-                    let rcontent = CompletionResponseContent::Text(text);
-                    rcontents.push(rcontent);
+        for step in gresponse.steps {
+            match step {
+                UserInput { content } => {
+                    let rcontent = &content[0];
+                    let rtext = CompletionResponseContent::Text(rcontent.text.clone());
+                    rcontents.push(rtext);
+                }
+                ModelOutput { content } => {
+                    let rcontent = &content[0];
+                    let rtext = CompletionResponseContent::Text(rcontent.text.clone());
+                    rcontents.push(rtext);
+                }
+                Thought {
+                    summary,
+                    // r#type,
+                    signature,
+                } => {
+                    if let Some(summary) = summary {
+                        let rcontent = &summary[0];
+                        let rtext = CompletionResponseContent::Thought(rcontent.text.clone());
+                        rcontents.push(rtext);
+                    } else {
+                        let rtext = CompletionResponseContent::Thought(signature);
+                        rcontents.push(rtext);
+                    }
                 }
                 FunctionCall {
-                    arguments,
                     id,
+                    arguments,
                     name,
                 } => {
                     let rcontent = CompletionResponseContent::ToolCall(ToolCallRequest {
@@ -100,13 +120,33 @@ impl GeminiClient {
                     });
                     rcontents.push(rcontent);
                 }
-                Thought { signature } => {
-                    let rcontent: CompletionResponseContent =
-                        CompletionResponseContent::Thought(signature);
-                    rcontents.push(rcontent);
-                }
             }
         }
+        // for output in gresponse.outputs {
+        //     match output {
+        //         Text { text } => {
+        //             let rcontent = CompletionResponseContent::Text(text);
+        //             rcontents.push(rcontent);
+        //         }
+        //         FunctionCall {
+        //             arguments,
+        //             id,
+        //             name,
+        //         } => {
+        //             let rcontent = CompletionResponseContent::ToolCall(ToolCallRequest {
+        //                 id,
+        //                 name,
+        //                 arguments,
+        //             });
+        //             rcontents.push(rcontent);
+        //         }
+        //         Thought { signature } => {
+        //             let rcontent: CompletionResponseContent =
+        //                 CompletionResponseContent::Thought(signature);
+        //             rcontents.push(rcontent);
+        //         }
+        //     }
+        // }
 
         let cusage = gresponse.usage;
         let usage = CompletionResponseTokenUsage {
@@ -155,7 +195,7 @@ impl LlmClient for GeminiClient {
             .parse()
             .map_err(|_| HttpError::ApiKeyParsingFailed)?;
         headers.insert("x-goog-api-key", api_key);
-        headers.insert("Api-Revision", HeaderValue::from_static("2026-05-07"));
+        // headers.insert("Api-Revision", HeaderValue::from_static("2026-05-07"));
 
         let grequest = GeminiInteractionsRequest::new(request)
             .map_err(|e| HttpError::CompletionRequestError(e.to_string()))?;
@@ -190,6 +230,10 @@ impl LlmClient for GeminiClient {
                         break;
                     }
                 };
+                // debug!("event: {:?}", event);
+                debug!(target: "agent-gemini",
+                event= ?event
+                );
 
                 if event.data.contains("[DONE]") {
                     yield Ok(CompletionChunkResponse::default());
@@ -203,8 +247,9 @@ impl LlmClient for GeminiClient {
                         ))
                     })?;
 
+
                 match chunk.event_type.as_str() {
-                    "content.delta" => {
+                    "content.delta" | "step.delta" => {
                         if let Some(delta) = chunk.delta {
                             let dtype = delta.r#type;
                             // debug!("Type: {}", dtype);
@@ -225,7 +270,7 @@ impl LlmClient for GeminiClient {
                             }
                         }
                     }
-                    "interaction.complete" => {
+                    "interaction.complete" | "interaction.completed" => {
                         if let Some(interaction) = chunk.interaction {
                             let cusage = interaction.usage.unwrap();
 

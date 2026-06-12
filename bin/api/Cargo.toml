@@ -23,26 +23,26 @@ tower-http.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 
-#rustic-agent.workspace=true
-#rustic-boot.workspace=true
-#rustic-core.workspace=true
-#rustic-economic = { workspace = true, features = ["reader"] }
-#rustic-finance.workspace=true
-#rustic-ml.workspace=true
-#rustic-providers.workspace=true
-#rustic-storage.workspace = true
+rustic-agent.workspace=true
+rustic-boot.workspace=true
+rustic-core.workspace=true
+rustic-economic = { workspace = true, features = ["reader"] }
+rustic-finance.workspace=true
+rustic-ml.workspace=true
+rustic-providers.workspace=true
+rustic-storage.workspace = true
 
-rustic-agent = { git = "https://github.com/rkapps/rustic-ai-backend-rs.git ", package = "rustic-agent"}
-rustic-core = { git = "https://github.com/rkapps/rustic-ai-backend-rs.git ", package = "rustic-core"}
-rustic-boot = { git = "https://github.com/rkapps/rustic-ai-backend-rs.git ", package = "rustic-boot"}
-rustic-economic = { git = "https://github.com/rkapps/rustic-ai-backend-rs.git ", package = "rustic-economic", default-features= false, features = ["reader"]}
-rustic-finance = { git = "https://github.com/rkapps/rustic-ai-backend-rs.git ", package = "rustic-finance"}
-rustic-ml = { git = "https://github.com/rkapps/rustic-ai-backend-rs.git ", package = "rustic-ml"}
-rustic-providers = { git = "https://github.com/rkapps/rustic-ai-backend-rs.git ", package = "rustic-providers"}
-rustic-storage = { git = "https://github.com/rkapps/rustic-ai-backend-rs.git ", package = "rustic-storage"}
+#rustic-agent = { git = "https://github.com/rkapps/rustic-ai-backend-rs.git ", package = "rustic-agent"}
+#rustic-core = { git = "https://github.com/rkapps/rustic-ai-backend-rs.git ", package = "rustic-core"}
+#rustic-boot = { git = "https://github.com/rkapps/rustic-ai-backend-rs.git ", package = "rustic-boot"}
+#rustic-economic = { git = "https://github.com/rkapps/rustic-ai-backend-rs.git ", package = "rustic-economic", default-features= false, features = ["reader"]}
+#rustic-finance = { git = "https://github.com/rkapps/rustic-ai-backend-rs.git ", package = "rustic-finance"}
+#rustic-ml = { git = "https://github.com/rkapps/rustic-ai-backend-rs.git ", package = "rustic-ml"}
+#rustic-providers = { git = "https://github.com/rkapps/rustic-ai-backend-rs.git ", package = "rustic-providers"}
+#rustic-storage = { git = "https://github.com/rkapps/rustic-ai-backend-rs.git ", package = "rustic-storage"}
 
 # external
-#bset-sales   = { path = "../../../bset-backend/crates/bset-sales" }
-bset-sales = { git = "https://github.com/rkapps/bset-backend.git ", package = "bset-sales"}
+bset-sales   = { path = "../../../bset-backend/crates/bset-sales" }
+#bset-sales = { git = "https://github.com/rkapps/bset-backend.git ", package = "bset-sales"}
 
 

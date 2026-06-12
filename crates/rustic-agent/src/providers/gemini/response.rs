@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// Top-level response from `POST /v1beta/interactions`.
@@ -7,10 +7,47 @@ pub struct GeminiInteractionsResponse {
     /// Provider-assigned interaction ID (used as `previous_interaction_id` in follow-up turns).
     pub id: Option<String>,
     pub model: String,
+    /// steps
+    pub steps: Vec<GeminiStepsResponseOutput>,
     /// Ordered output items produced by the model.
-    pub outputs: Vec<GeminiInteractionsResponseOutput>,
+    // pub outputs: Vec<GeminiInteractionsResponseOutput>,
     pub status: String,
     pub usage: GeminiInteractionsResponseTokenUsage,
+}
+
+/// A single output item in a Gemini response, discriminated by `type`.
+#[derive(Deserialize, Debug)]
+#[serde(tag = "type")]
+pub enum GeminiStepsResponseOutput {
+    /// input from the uesr
+    #[serde(rename = "user_input")]
+    UserInput { content: Vec<GeminiTextContent> },
+
+    /// input from the model
+    #[serde(rename = "model_output")]
+    ModelOutput { content: Vec<GeminiTextContent> },
+
+    /// Thought
+    #[serde(rename = "thought")]
+    Thought {
+        // r#type: String,
+        summary: Option<Vec<GeminiTextContent>>,
+        signature: String,
+    },
+
+    /// A function/tool call requested by the model.
+    #[serde(rename = "function_call")]
+    FunctionCall {
+        id: String,
+        arguments: Value,
+        name: String,
+    },
+}
+
+#[derive(Deserialize, Debug, Clone, Serialize)]
+pub struct GeminiTextContent {
+    pub r#type: String,
+    pub text: String,
 }
 
 /// A single output item in a Gemini response, discriminated by `type`.
