@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use rust_decimal::prelude::ToPrimitive;
-use serde::{Deserialize, Serialize};
-
 use crate::domain::Ticker;
+use rust_decimal::prelude::ToPrimitive;
+use rustic_core::serialize_vec_or_null;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TickerSnapshot {
@@ -15,8 +15,11 @@ pub struct TickerSnapshot {
     pub fundamentals: TickerSnapshotFundamentals,
     pub performance: HashMap<String, HashMap<String, f64>>,
 
+    #[serde(serialize_with = "serialize_vec_or_null")]
     pub technical_signals: Vec<String>,
+    #[serde(serialize_with = "serialize_vec_or_null")]
     pub mlp_signals: Vec<String>,
+    #[serde(serialize_with = "serialize_vec_or_null")]
     pub ml_signals: Vec<String>,
 }
 
