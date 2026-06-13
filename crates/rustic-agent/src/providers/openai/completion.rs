@@ -62,15 +62,12 @@ impl LlmClient for OpenAIClient {
             .map_err(|_| HttpError::ApiKeyParsingFailed)?;
 
         headers.insert("Authorization", bearer);
-
-        let orequest = OpenAICompletionRequest::new(request)
+        let orequest = OpenAICompletionRequest::new(request.clone())
             .map_err(|e| HttpError::CompletionRequestError(e.to_string()))?;
 
-        debug!(target: "agent-openai",
-            store= ?orequest.store,
-            response_id = ?orequest.previous_response_id,
-            "OpenAICompletionRequest: {:#?}", orequest.input.len()
-        );
+        orequest.log_info();
+        orequest.log_debug();
+        orequest.log_trace();
 
         let body = serde_json::json!(orequest);
         // debug!("Body: {:#?}", body);
@@ -78,6 +75,12 @@ impl LlmClient for OpenAIClient {
             .http_client
             .post_request::<OpenAICompletionResponse>(url, Some(headers), body)
             .await?;
+        let id = if request.store.clone() {
+            oresponse.id.clone()
+        } else {
+            String::new()
+        };
+
 
         debug!(
             target: "agent-openai",
@@ -85,7 +88,6 @@ impl LlmClient for OpenAIClient {
         );
 
         let mut rcontents: Vec<CompletionResponseContent> = Vec::new();
-        let id = oresponse.id;
 
         for output in oresponse.output {
             match output {
@@ -182,20 +184,18 @@ impl LlmClient for OpenAIClient {
         headers.insert("Accept", event_stream);
         headers.insert("Accept-Encoding", accept_encoding);
 
-        let request = OpenAICompletionRequest::new(request)
+        let request = OpenAICompletionRequest::new(request.clone())
             .map_err(|e| HttpError::CompletionRequestError(e.to_string()))?;
 
-        debug!(
-            target: "agent-openai",
-            "OpenAI Request: {:#?}", request
-        );
+        request.log_info();
+        request.log_debug();
+        request.log_trace();
 
         let body = serde_json::json!(request);
         let response = self
             .http_client
             .post_stream_request(url, Some(headers), body)
             .await?;
-
         // debug!("✅ Got response: {:?}", response.error_for_status());
         if response.status() == 400 {
             let error_body = response
@@ -307,10 +307,16 @@ impl LlmClient for OpenAIClient {
                               debug!(target: "agent-openai", "Response stats - model: {:#?} response_id: {} usage: {:#?}",
                                 response.model, response.id, usage );
 
+                                let id = if request.store.clone() {
+                                    response.id.clone()
+                                } else {
+                                    String::new()
+                                };
+                        
                              yield Ok(CompletionChunkResponse::stop(
                                  agent_id.clone(),
                                  response.model,
-                                 response.id,
+                                 id,
                                  Some(usage),
                              ))
                          }

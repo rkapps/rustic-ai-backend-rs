@@ -93,7 +93,9 @@ impl LlmClient for AnthropicClient {
         let arequest = AnthropicCompletionRequest::new(request)
             .map_err(|e| HttpError::CompletionRequestError(e.to_string()))?;
 
-        debug!("AnthropicCompletionRequest {:#?}", arequest);
+        arequest.log_info();
+        arequest.log_debug();
+        arequest.log_trace();
 
         let body = serde_json::json!(arequest);
         let aresponse = self
@@ -181,7 +183,9 @@ impl LlmClient for AnthropicClient {
 
         let arequest = AnthropicCompletionRequest::new(request)
             .map_err(|e| HttpError::CompletionRequestError(e.to_string()))?;
-        debug!("AnthropicCompletionRequest {:#?}", arequest);
+        arequest.log_info();
+        arequest.log_debug();
+        arequest.log_trace();
 
         let body = serde_json::json!(arequest);
 

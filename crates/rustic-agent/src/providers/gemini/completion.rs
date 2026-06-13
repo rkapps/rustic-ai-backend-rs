@@ -73,8 +73,10 @@ impl GeminiClient {
         let grequest = GeminiInteractionsRequest::new(request)
             .map_err(|e| HttpError::CompletionRequestError(e.to_string()))?;
 
-        debug!(target: "agent-gemini", "Gemini complete_interactions: {:#?}", grequest);
-        println!("before ------------------------");
+        grequest.log_info();
+        grequest.log_debug();
+        grequest.log_trace();
+
         let body = serde_json::json!(grequest);
         let gresponse = self
             .http_client
@@ -103,9 +105,10 @@ impl GeminiClient {
                     signature,
                 } => {
                     if let Some(summary) = summary {
-                        let rcontent = &summary[0];
-                        let rtext = CompletionResponseContent::Thought(rcontent.text.clone());
-                        rcontents.push(rtext);
+                        // the summary should not be part of thought
+                        // let rcontent = &summary[0];
+                        // let rtext = CompletionResponseContent::Thought(rcontent.text.clone());
+                        // rcontents.push(rtext);
                     } else {
                         let rtext = CompletionResponseContent::Thought(signature);
                         rcontents.push(rtext);
@@ -275,11 +278,12 @@ impl LlmClient for GeminiClient {
                                     }
                                 }
                                 "thought_summary" => {
-                                    if let Some(content) = delta.content {
-                                        if let Some(text) = content.text {
-                                            yield Ok(CompletionChunkResponse::thought(agent_id.clone(), text));
-                                        }
-                                    }
+                                    // the summary should not be part of thought
+                                    // if let Some(content) = delta.content {
+                                    //     if let Some(text) = content.text {
+                                    //         yield Ok(CompletionChunkResponse::thought(agent_id.clone(), text));
+                                    //     }
+                                    // }
                                 }
                                 "thought_signature" => {
                                     if let Some(sig) = delta.signature {

@@ -27,6 +27,8 @@ pub struct CompletionRequest {
     pub stream: bool,
     /// Tool schemas made available to the model during this request.
     pub definitions: Vec<ToolDefinition>,
+
+    pub last_response_id: Option<String>,
 }
 
 /// Controls the depth of chain-of-thought reasoning the model applies before responding.

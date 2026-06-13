@@ -110,12 +110,19 @@ impl Agent {
         let system_prompt = self.system_prompt.clone();
         let new_definitions = definitions.clone();
         let agent_id = self.id.clone();
-
+        let mut last_response_id = current_messages.iter().rev().find_map(|m| {
+            if let Message::User { response_id, .. } = m {
+                response_id.clone()
+            } else {
+                None
+            }
+        });
         info!(  model= %agent.model,
                 temperature= %agent.temperature,
                 reasoning= ?&agent.reasoning_effort,
                 maxtokens= %agent.max_tokens,
                 store= %agent.store,
+                last_response_id= ?last_response_id,
                 "Agent: {} - Completion Start", agent_id
         );
 
@@ -123,13 +130,7 @@ impl Agent {
             let mut iteration = 0;
             const MAX_ITERATIONS: usize = 10;
 
-            let last_assistant = current_messages.iter().rev().find_map(|m| {
-                if let Message::Assistant { response_id, .. } = m {
-                    response_id.clone()
-                } else {
-                    None
-                }
-            });
+          
             let mut usage = crate::client::response::CompletionResponseTokenUsage::default();
 
             debug!(target: "agent-messages",
@@ -141,9 +142,10 @@ impl Agent {
                 if iteration > MAX_ITERATIONS {
                     break;
                 }
+
                 info!(iteration= %iteration,
                     messages= ?current_messages.len(),
-                    last_response_id = ?last_assistant,
+                    last_response_id = ?last_response_id,
                     "Agent: {} - ", agent_id
                 );
 
@@ -159,6 +161,7 @@ impl Agent {
                     stream: true,
                     store: agent.store,
                     definitions: new_definitions.clone(),
+                    last_response_id: last_response_id.clone()
                 };
 
                 let mut llm_stream = match agent.client.complete_with_stream(request).await {
@@ -172,7 +175,7 @@ impl Agent {
                 let mut tool_calls = Vec::new();
 
                 let mut model = String::new();
-                let mut response_id = String::new();
+                // let mut response_id = String::new();
                 // Gemini sends partial thought tokens as random-looking characters; accumulate
                 // the full thought before appending it as a Thought message so the model receives
                 // a coherent block on the next turn.
@@ -192,14 +195,19 @@ impl Agent {
                         debug!(agent= %agent_id, tool_call= ?call, "Tool Call");
                         tool_calls.push(call);
                     } else {
-                        debug!(
+                        trace!(
                             chunk= ?chunk,
                             "Agent: {}", agent_id
                         );
 
                         if chunk.is_final {
+                            debug!(
+                                chunk= ?chunk,
+                                "Agent: {}", agent_id
+                            );
+    
                             usage += chunk.usage.unwrap();
-                            response_id = chunk.response_id;
+                            last_response_id = Some(chunk.response_id);
                             model = chunk.model;
                         } else if !chunk.content.is_empty() {
                             let _ = tx.send(Ok(chunk)).await;
@@ -215,14 +223,13 @@ impl Agent {
 
                 info!(
                     tool_calls= %tool_calls.len(),
-                    response_id= %response_id,
+                    new_response_id= ?last_response_id,
                     "Agent: {} - ", agent_id
                 );
 
                 if tool_calls.is_empty() {
                     info!(
                         model=%model,
-                        response_id= ?response_id,
                         usage= %format_args!("{:#?}", usage),
                         "Agent: {} - Response Stats final", agent_id
                     );
@@ -231,7 +238,7 @@ impl Agent {
                         .send(Ok(CompletionChunkResponse::stop(
                             agent_id.clone(),
                             model,
-                            response_id,
+                            last_response_id.clone().unwrap_or_default(),
                             Some(usage),
                         )))
                         .await;
@@ -290,9 +297,9 @@ impl Agent {
                         "Agent: {} - ", agent_id
                     );
 
-                    if agent.store && !response_id.is_empty() {
+                    if agent.store && let Some(response_id) = last_response_id.clone() {
                         // keep only the original user message, clear tool calls/results from previous iteration
-                        current_messages.retain(|m| matches!(m, Message::User { .. }));
+                        // current_messages.retain(|m| matches!(m, Message::User { .. }));
                         // inject last response_id into the user message
                         if let Some(Message::User { content, .. }) = current_messages.first_mut() {
                             let last_response_id = Some(response_id);
@@ -346,16 +353,26 @@ impl Agent {
             "Agent: {} - Mcp_definitions", self.id
         );
 
+        mcp_definitions
+            .iter()
+            .for_each(|e| definitions.push(e.1.clone()));
+
+        let mut last_response_id = messages.iter().rev().find_map(|m| {
+            if let Message::User { response_id, .. } = m {
+                response_id.clone()
+            } else {
+                None
+            }
+        });  
+
         info!(  model= %agent.model,
             temperature= %agent.temperature,
             reasoning= ?&agent.reasoning_effort,
             maxtokens= %agent.max_tokens,
+            last_response_id= ?last_response_id,           
             "Agent: {} - Completion Start", agent_id
         );
 
-        mcp_definitions
-            .iter()
-            .for_each(|e| definitions.push(e.1.clone()));
 
         let request = CompletionRequest {
             id: self.id.clone(),
@@ -369,6 +386,7 @@ impl Agent {
             reasoning_effort: self.reasoning_effort.clone(),
             enable_cache: self.enable_cache,
             definitions,
+            last_response_id: None
         };
 
         const MAX_ITERATIONS: usize = 10;
@@ -376,7 +394,7 @@ impl Agent {
 
         let mut nrequest = request;
         let delay = Duration::from_millis(2000);
-        let mut last_response_id = String::default();
+
         loop {
             iteration += 1;
             info!(
@@ -400,23 +418,10 @@ impl Agent {
 
             trace!("CompletionRequest: {:#?}", nrequest);
 
-            // At the start of each iteration (not after tool calls)
-            if agent.store && !last_response_id.is_empty() {
-                if let Some(Message::User {
-                    content: _,
-                    response_id,
-                }) = nrequest
-                    .messages
-                    .iter_mut()
-                    .find(|m| matches!(m, Message::User { .. }))
-                {
-                    *response_id = Some(last_response_id.clone());
-                }
-            }
-
             // Call the llm with the request
+            nrequest.last_response_id = last_response_id.clone();
             let response = self.client.complete(nrequest.clone()).await?;
-            last_response_id = response.response_id.clone();
+            last_response_id = Some(response.response_id.clone());
 
             // Get the tools
             let tool_calls: Vec<&ToolCallRequest> = response
@@ -443,7 +448,6 @@ impl Agent {
 
             info!(
                 tool_calls= ?tool_calls.len(),
-                response_id= ?response.response_id,
                 "Agent: {} - Response Stats final", agent_id
             );
 
@@ -493,8 +497,8 @@ impl Agent {
             for result in results {
                 match result {
                     Ok((tool_call, tool_output)) => {
-                        info!(target: "agent-tool", tool_call= ?tool_call, "Agent: {} - ", agent_id);
-                        info!(target: "agent-tool", tool_output= ?tool_output, "Agent: {} - ", agent_id );
+                        debug!(target: "agent-tool", tool_call= ?tool_call, "Agent: {} - ", agent_id);
+                        debug!(target: "agent-tool", tool_output= ?tool_output, "Agent: {} - ", agent_id );
                         nmessages.push(tool_call);
                         nmessages.push(tool_output);
                     }
@@ -512,6 +516,18 @@ impl Agent {
             );
 
             if !nmessages.is_empty() {
+                if agent.store && let Some(response_id) = last_response_id.clone() {
+                    // keep only the original user message, clear tool calls/results from previous iteration
+                    // nmessages.retain(|m| matches!(m, Message::User { .. }));
+                    // inject last response_id into the user message
+                    if let Some(Message::User { content, .. }) = nmessages.first_mut() {
+                        let last_response_id = Some(response_id);
+                        *nmessages.first_mut().unwrap() = Message::User {
+                            content: content.clone(),
+                            response_id: last_response_id, // ← inject response_id
+                        };
+                    }
+                }
                 nrequest.messages.extend(nmessages);
             }
         }
