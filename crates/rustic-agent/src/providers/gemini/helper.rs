@@ -1,3 +1,7 @@
+use crate::{
+    CompletionResponseTokenUsage, providers::gemini::response::GeminiInteractionsResponseTokenUsage,
+};
+
 pub fn clean_for_gemini(params: &serde_json::Value) -> serde_json::Value {
     match params {
         serde_json::Value::Object(map) => {
@@ -47,5 +51,23 @@ pub fn clean_for_gemini(params: &serde_json::Value) -> serde_json::Value {
             serde_json::Value::Array(arr.iter().map(clean_for_gemini).collect())
         }
         other => other.clone(),
+    }
+}
+
+pub fn to_completion_reponse_token_usage(
+    cusage: GeminiInteractionsResponseTokenUsage,
+) -> CompletionResponseTokenUsage {
+    CompletionResponseTokenUsage {
+        input_tokens: cusage.total_input_tokens - cusage.total_cached_tokens,
+        cached_read_tokens: cusage.total_cached_tokens,
+        cached_write_tokens: 0,
+        tool_use_tokens: cusage.total_tool_use_tokens,
+        output_tokens: cusage.total_output_tokens, // Gemini already excludes thought tokens here
+        reasoning_tokens: cusage.total_thought_tokens,
+        total_tokens: (cusage.total_input_tokens - cusage.total_cached_tokens)  // fresh input
+                                 + cusage.total_cached_tokens                                         // cache reads
+                                 + cusage.total_tool_use_tokens                                       // tools
+                                 + cusage.total_output_tokens                                         // visible output
+                                 + cusage.total_thought_tokens, // reasoning
     }
 }

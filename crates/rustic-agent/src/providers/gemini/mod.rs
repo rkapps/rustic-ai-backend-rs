@@ -4,6 +4,7 @@ pub mod completion;
 pub mod helper;
 pub mod request;
 pub mod response;
+pub mod chunk;
 
 /// Provider identifier returned by [`models`] callers for display or routing.
 pub const LLM: &str = "Gemini";

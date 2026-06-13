@@ -1,9 +1,12 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use eventsource_stream::Eventsource;
 use futures::StreamExt;
 use reqwest::header::HeaderValue;
 use rustic_core::{HttpClient, HttpError, HttpResult};
+use serde_json::Value;
 use tracing::{debug, error, trace};
 
 use crate::{
@@ -18,9 +21,11 @@ use crate::{
     },
     providers::gemini::{
         GEMINI_BASE_URL,
+        chunk::GeminiChunkEvent,
+        helper::to_completion_reponse_token_usage,
         request::GeminiInteractionsRequest,
         response::{
-            GeminiInteractionsChunkResponse, GeminiInteractionsResponse,
+            GeminiInteractionsResponse,
             GeminiStepsResponseOutput::{FunctionCall, ModelOutput, Thought, UserInput},
         },
     },
@@ -64,7 +69,6 @@ impl GeminiClient {
             .map_err(|_| HttpError::ApiKeyParsingFailed)?;
 
         headers.insert("x-goog-api-key", api_key);
-        // headers.insert("Api-Revision", HeaderValue::from_static("2026-05-20"));
 
         let grequest = GeminiInteractionsRequest::new(request)
             .map_err(|e| HttpError::CompletionRequestError(e.to_string()))?;
@@ -121,31 +125,6 @@ impl GeminiClient {
                 }
             }
         }
-        // for output in gresponse.outputs {
-        //     match output {
-        //         Text { text } => {
-        //             let rcontent = CompletionResponseContent::Text(text);
-        //             rcontents.push(rcontent);
-        //         }
-        //         FunctionCall {
-        //             arguments,
-        //             id,
-        //             name,
-        //         } => {
-        //             let rcontent = CompletionResponseContent::ToolCall(ToolCallRequest {
-        //                 id,
-        //                 name,
-        //                 arguments,
-        //             });
-        //             rcontents.push(rcontent);
-        //         }
-        //         Thought { signature } => {
-        //             let rcontent: CompletionResponseContent =
-        //                 CompletionResponseContent::Thought(signature);
-        //             rcontents.push(rcontent);
-        //         }
-        //     }
-        // }
 
         let cusage = gresponse.usage;
         let usage = CompletionResponseTokenUsage {
@@ -194,11 +173,13 @@ impl LlmClient for GeminiClient {
             .parse()
             .map_err(|_| HttpError::ApiKeyParsingFailed)?;
         headers.insert("x-goog-api-key", api_key);
-        // headers.insert("Api-Revision", HeaderValue::from_static("2026-05-07"));
 
         let grequest = GeminiInteractionsRequest::new(request)
             .map_err(|e| HttpError::CompletionRequestError(e.to_string()))?;
-        debug!(target: "agent-gemini", request= %format_args!("{:#?}", grequest), "Gemini Completion");
+
+        grequest.log_info();
+        grequest.log_debug();
+        grequest.log_trace();
 
         let body = serde_json::json!(grequest);
         trace!(target: "agent-gemini", body= ?body, "Gemini Completion body");
@@ -218,6 +199,7 @@ impl LlmClient for GeminiClient {
         }
 
         let mut event_stream = response.bytes_stream().eventsource();
+        let mut pending_tool_calls: HashMap<usize, (String, String, String)> = HashMap::new();
 
         let stream = async_stream::stream! {
 
@@ -229,16 +211,15 @@ impl LlmClient for GeminiClient {
                         break;
                     }
                 };
-                // debug!("event: {:?}", event);
-                trace!(target: "agent-gemini",
-                event= ?event
+                trace!(target: "gemini-chunk",
+                    event= ?event
                 );
 
                 if event.data.contains("[DONE]") {
                     yield Ok(CompletionChunkResponse::default());
                     break;
                 }
-                let chunk: GeminiInteractionsChunkResponse = serde_json::from_str(&event.data)
+                let chunk: GeminiChunkEvent = serde_json::from_str(&event.data)
                     .map_err(|e| {
                         HttpError::Other(format!(
                             "GeminiChunkResponse error: {:?} for data {:?}",
@@ -246,64 +227,104 @@ impl LlmClient for GeminiClient {
                         ))
                     })?;
 
-                debug!(target: "agent-gemini",
-                    event_type= ?&chunk.event_type
-                );
-
-                match chunk.event_type.as_str() {
-                    "content.delta" | "step.delta" => {
-                        if let Some(delta) = chunk.delta {
-                            let dtype = delta.r#type;
-                            // debug!("Type: {}", dtype);
-                            if let Some(text) = delta.text {
-                                yield Ok(CompletionChunkResponse::content(agent_id.clone(), text, String::new()))
-                            } else if let Some(signature) = delta.signature {
-                                // debug!("chunk: {:#?}", signature);
-                                debug!(target: "agent-gemini", signature= ?signature, "Chunk Signature");
-
-                                yield Ok(CompletionChunkResponse::thought(agent_id.clone(), signature))
-                            } else if dtype == "function_call" {
-                                yield Ok(CompletionChunkResponse::tool_call(
-                                    agent_id.clone(),
-                                    delta.id,
-                                    delta.name,
-                                    delta.arguments,
-                                ))
+                // debug!(target: "gemini-chunk",
+                //     event_type= ?&event
+                // );
+                match chunk {
+                    GeminiChunkEvent::InteractionCreated { interaction: _, metadata: _ } => {
+                    }
+                    GeminiChunkEvent::InteractionCompleted { interaction } => {
+                        if let Some(interaction) = interaction {
+                            debug!(
+                                target: "gemini-chunk",
+                                interaction= ?&interaction.id,
+                                usage= ?&interaction.usage
+                            );
+                            if let Some(usage) = interaction.usage {
+                                let total_usage = to_completion_reponse_token_usage(usage);
+                                yield Ok(CompletionChunkResponse::stop(
+                                        agent_id.clone(),
+                                            interaction.model,
+                                            interaction.id,
+                                            Some(total_usage),
+                                        ))
                             }
                         }
                     }
-                    "interaction.complete" | "interaction.completed" => {
-                        if let Some(interaction) = chunk.interaction {
-                            let cusage = interaction.usage.unwrap();
+                    GeminiChunkEvent::StartDelta { index, step} => {
+                        if let Some(step) = step {
+                            if step.r#type == "function_call" {
+                                pending_tool_calls.insert(
+                                    index.unwrap_or(0),
+                                    (step.id.unwrap_or_default(), step.name.unwrap_or_default(), String::new())
+                                );
+                            } else {
+                                debug!(
+                                    target: "gemini-chunk",
+                                    step= ?&step
+                                );
+                            }
+                        }
+                    }
+                    GeminiChunkEvent::StepDelta { index, delta} => {
+                        if let Some(delta) = delta {
+                            match delta.r#type.as_str() {
+                                "arguments_delta" => {
+                                    if let Some(entry) = pending_tool_calls.get_mut(&index.unwrap_or(0)) {
+                                        entry.2.push_str(&delta.arguments.unwrap_or_default());
+                                    }
+                                }
+                                "thought_summary" => {
+                                    if let Some(content) = delta.content {
+                                        if let Some(text) = content.text {
+                                            yield Ok(CompletionChunkResponse::thought(agent_id.clone(), text));
+                                        }
+                                    }
+                                }
+                                "thought_signature" => {
+                                    if let Some(sig) = delta.signature {
+                                        yield Ok(CompletionChunkResponse::thought(agent_id.clone(), sig));
+                                    }
+                                }
+                                "text" => {
+                                    // debug!(
+                                    //     target: "gemini-chunk",
+                                    //     delta= ?&delta
+                                    // );
+                                    if let Some(text) = delta.text {
+                                        yield Ok(CompletionChunkResponse::content(agent_id.clone(), text, String::new()));
+                                    }
+                                }
+                                _ => {
+                                    debug!(
+                                        target: "gemini-chunk",
+                                        delta= ?&delta.r#type
+        
+                                    );
+       
+                                }
+                            }
+                        }
+                    }
+                    GeminiChunkEvent::StopDelta { index, metadata: _} => {
 
-                         //    info!("chunk token: {:#?}", cusage);
-                          let usage = CompletionResponseTokenUsage {
-                             input_tokens: cusage.total_input_tokens - cusage.total_cached_tokens,
-                             cached_read_tokens: cusage.total_cached_tokens,
-                             cached_write_tokens: 0,
-                             tool_use_tokens: cusage.total_tool_use_tokens,
-                             output_tokens: cusage.total_output_tokens,  // Gemini already excludes thought tokens here
-                             reasoning_tokens: cusage.total_thought_tokens,
-                             total_tokens: (cusage.total_input_tokens - cusage.total_cached_tokens)  // fresh input
-                                 + cusage.total_cached_tokens                                         // cache reads
-                                 + cusage.total_tool_use_tokens                                       // tools
-                                 + cusage.total_output_tokens                                         // visible output
-                                 + cusage.total_thought_tokens,                                       // reasoning
-                         };
-
-                    debug!(target: "agent-gemini", model= ?interaction.model, response_id= ?interaction.id, usage= ?usage, "Response stats");
-
-                    yield Ok(CompletionChunkResponse::stop(
-                            agent_id.clone(),
-                                interaction.model,
-                                interaction.id,
-                                Some(usage),
+                        if let Some((id, name, args)) = pending_tool_calls.remove(&index.unwrap_or(0)) {
+                            let arguments: Value = serde_json::from_str(&args).unwrap_or(Value::Null);
+                            yield Ok(CompletionChunkResponse::tool_call(
+                                agent_id.clone(),
+                                Some(id),
+                                Some(name),
+                                Some(arguments),
                             ))
                         }
                     }
-                    _ => yield Ok(CompletionChunkResponse::default()),
+                    GeminiChunkEvent::Unknown => {
+                        debug!(
+                            target: "gemini-chunk",
+                            "Unknown event type: {:?}", event
+                        );
+                    }
                 }
-
             }
 
         };

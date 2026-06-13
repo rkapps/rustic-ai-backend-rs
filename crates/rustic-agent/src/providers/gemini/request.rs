@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use serde::Serialize;
 use serde_json::Value;
+use tracing::{debug, info, trace};
 
 use crate::{
     client::{
@@ -17,7 +18,6 @@ use crate::{
 #[derive(Debug, Serialize)]
 pub struct GeminiInteractionsRequest {
     model: String,
-    // input: Vec<GeminiCompletionRequestInput>,
     input: Vec<GeminiStepRequestInput>,
     /// Links this request to a prior interaction for conversation threading.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -28,6 +28,43 @@ pub struct GeminiInteractionsRequest {
     generation_config: GeminiCompletionRequestConfig,
     pub tools: Vec<ToolDefinition>,
 }
+
+
+impl GeminiInteractionsRequest {
+    pub fn log_info(&self) {
+        info!(
+            target: "agent-gemini",
+            model = %self.model,
+            store = self.store,
+            messages = self.input.len(),
+            tools = self.tools.len(),
+            "Gemini request"
+        );
+    }
+
+    pub fn log_debug(&self) {
+        debug!(
+            target: "agent-gemini",
+            model = %self.model,
+            store = self.store,
+            temperature = %format!("{:.1}", self.generation_config.temperature),
+            thinking_level = %self.generation_config.thinking_level,
+            max_tokens = self.generation_config.max_output_tokens,
+            messages = %format!("{:#?}", self.input),
+            tools = self.tools.len(),
+            "Gemini request"
+        );
+    }
+
+    pub fn log_trace(&self) {
+        trace!(
+            target: "agent-gemini",
+            request = ?self,
+            "Gemini full request"
+        );
+    }
+}
+
 
 /// A single input item in the Gemini request, serialized without an enum tag.
 #[derive(Serialize, Debug)]
@@ -139,33 +176,21 @@ impl GeminiInteractionsRequest {
     pub fn new(request: CompletionRequest) -> Result<Self> {
         let mut inputs: Vec<GeminiStepRequestInput> = Vec::new();
         let mut function_result_contents: Vec<GeminiStepRequestInput> = Vec::new();
-        let mut model_contents: Vec<GeminiStepRequestInput> = Vec::new();
-        // let mut user_input: Option<GeminiCompletionRequestInput> = None;
+        let model_contents: Vec<GeminiStepRequestInput> = Vec::new();
         let mut id: Option<String> = None;
         let mut user_input: Option<GeminiStepRequestInput> = None;
-        // let mut thoughts = Vec::new();
 
         let crequest = request.clone();
         for message in request.messages {
             match message {
                 Message::Thought { content } => {
-                    // model_contents.push(GeminiModelContent::Thought {
-                    //     r#type: "thought".to_string(),
-                    //     signature: content,
-                    // });
                     let signature = content;
-                    // let tcontent = GeminiTextContent {
-                    //     r#type: "text".to_string(),
-                    //     text: content.clone(),
-                    // };
-                    // thoughts.push(tcontent.clone());
                     let user_input = GeminiStepRequestInput::Thought {
                         r#type: "thought".to_string(),
                         summary: None,
                         signature: signature,
                     };
-                    // inputs.push(user_input);
-            
+                    inputs.push(user_input);
                 }
 
                 Message::User {
@@ -184,20 +209,11 @@ impl GeminiInteractionsRequest {
                             r#type: "text".to_string(),
                             text: content,
                         };
-                        // user_input = Some(GeminiCompletionRequestInput::Content {
-                        //     role: "user".to_string(),
-                        //     content,
-                        // });
                         user_input = Some(GeminiStepRequestInput::UserInput {
                             r#type: "user_input".to_string(),
                             content: vec![content],
                         });
-                        // inputs.push(user_input);
                     } else {
-                        // let user_input = GeminiCompletionRequestInput::Content {
-                        //     role: "user".to_string(),
-                        //     content,
-                        // };
                         let content = GeminiTextContent {
                             r#type: "text".to_string(),
                             text: content,
@@ -226,30 +242,14 @@ impl GeminiInteractionsRequest {
                             content: vec![content],
                         };
                         inputs.push(user_input);
-
-                        // let response_input = GeminiCompletionRequestInput::Content {
-                        //     role: "model".to_string(),
-                        //     content,
-                        // };
-                        // inputs.push(response_input);
                     }
                 }
 
                 Message::ToolCall {
-                    arguments,
-                    call_id,
-                    name,
+                    arguments: _,
+                    call_id: _,
+                    name: _,
                 } => {
-                    // let value = serde_json::from_str(&arguments)
-                    //     .context("Failed to serialize arguments for Gemini")?;
-                    // model_contents.push(GeminiStepRequestInput::FunctionCall {
-                    //     r#type: "function_call".to_string(),
-                    //     id: Some(call_id),
-                    //     call_id: None,
-                    //     name,
-                    //     result: None,
-                    //     arguments: value,
-                    // });
                 }
 
                 Message::ToolOutput {
@@ -257,12 +257,9 @@ impl GeminiInteractionsRequest {
                     output,
                     name,
                 } => {
-                    let arg_string = serde_json::to_string(&output)
-                        .context("Failed to serialize arguments for Gemini")?;
-                    let content = GeminiTextContent {
-                        r#type: "text".to_string(),
-                        text: arg_string,
-                    };                    function_result_contents.push(GeminiStepRequestInput::FunctionCall {
+                    // let arg_string = serde_json::to_string(&output)
+                    //     .context("Failed to serialize arguments for Gemini")?;
+                    function_result_contents.push(GeminiStepRequestInput::FunctionCall {
                         r#type: "function_result".to_string(),
                         call_id: Some(call_id),
                         id: None,
@@ -282,24 +279,14 @@ impl GeminiInteractionsRequest {
             inputs.push(input);
         }
 
-        // push thoughts
-
         // Push model message with thought + function calls combined
         if !model_contents.is_empty() {
             inputs.extend(model_contents);
-            // inputs.push(GeminiCompletionRequestInput::ModelContent {
-            //     role: "model".to_string(),
-            //     content: model_contents,
-            // });
         }
 
         // Push tool results
         if !function_result_contents.is_empty() {
             inputs.extend(function_result_contents);
-            // inputs.push(GeminiCompletionRequestInput::FunctionCallResult {
-            //     role: "user".to_string(),
-            //     content: function_result_contents,
-            // });
         }
 
         let grequest = GeminiInteractionsRequest {
