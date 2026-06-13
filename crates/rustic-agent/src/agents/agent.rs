@@ -193,7 +193,7 @@ impl Agent {
                         tool_calls.push(call);
                     } else {
                         debug!(
-                            chunk= ?chunk, 
+                            chunk= ?chunk,
                             "Agent: {}", agent_id
                         );
 
@@ -376,12 +376,15 @@ impl Agent {
 
         let mut nrequest = request;
         let delay = Duration::from_millis(2000);
-
+        let mut last_response_id = String::default();
         loop {
             iteration += 1;
             info!(
-                "Agent: {} Iteration: {}/{} messages: {:?}", 
-                agent_id, iteration, MAX_ITERATIONS, nrequest.messages.len()
+                "Agent: {} Iteration: {}/{} messages: {:?}",
+                agent_id,
+                iteration,
+                MAX_ITERATIONS,
+                nrequest.messages.len()
             );
             if iteration > 5 {
                 sleep(delay).await;
@@ -397,8 +400,24 @@ impl Agent {
 
             trace!("CompletionRequest: {:#?}", nrequest);
 
+            // At the start of each iteration (not after tool calls)
+            if agent.store && !last_response_id.is_empty() {
+                if let Some(Message::User {
+                    content,
+                    response_id,
+                }) = nrequest
+                    .messages
+                    .iter_mut()
+                    .find(|m| matches!(m, Message::User { .. }))
+                {
+                    *response_id = Some(last_response_id.clone());
+                }
+
+            }
+
             // Call the llm with the request
             let response = self.client.complete(nrequest.clone()).await?;
+            last_response_id = response.response_id.clone();
 
             // Get the tools
             let tool_calls: Vec<&ToolCallRequest> = response
@@ -485,7 +504,13 @@ impl Agent {
                     }
                 };
             }
-            info!("Agent: {} New messages: {:?}", agent_id, nmessages.len());
+            info!(
+                "Agent: {} store: {} last Response Id: {:?} New messages: {:?}",
+                agent_id,
+                nrequest.store,
+                last_response_id,
+                nmessages.len()
+            );
 
             if !nmessages.is_empty() {
                 nrequest.messages.extend(nmessages);
